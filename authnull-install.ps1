@@ -21,7 +21,7 @@ if (-not (Test-Path -Path $OutputPath -PathType Container)) {
         exit
     }
 } else {
-    Write-Host "Output directory already exists. Skipping download and extraction." -ForegroundColor Yellow
+    Write-Host "Output directory already exists...downloading now" -ForegroundColor Yellow
     
 }
 
@@ -202,7 +202,7 @@ if (Test-Path $AgentPath) {
     }
 
 #reusing agent path
-$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build\windows-build\windows-agent-amd64.exe"
+$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build\windows-agent-amd64.exe"
 
 
 
@@ -292,6 +292,18 @@ Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe"
 
 
 #Update other registry items for active directory plugin
+$registryKeyPath = "HKEY_LOCAL_MACHINE\SOFTWARE\pGina3"
+
+$multiLineContent = @"
+12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
+0f52390b-c781-43ae-bd62-553c77fa4cf7
+"@
+
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Type MultiString
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorizaation_Order" -Value $multiLineContent -Type MultiString
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Type MultiString
+
+
 
 
 # Define the registry key path
