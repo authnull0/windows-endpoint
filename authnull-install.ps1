@@ -269,7 +269,7 @@ $newValueData = @(
 
 # Set the multi-string value
 try {
-    Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $newValueData -Type MultiString -Force -Verbose
+    Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $newValueData -Force -Verbose -Type MultiString 
     Write-Host "Registry value modified successfully." -ForegroundColor Green
 } catch {
     Write-Host "Failed to modify registry value: $_" -ForegroundColor Red
@@ -292,17 +292,16 @@ Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe"
 
 
 #Update other registry items for active directory plugin
-$registryKeyPath = "HKEY_LOCAL_MACHINE\SOFTWARE\pGina3"
+$registryKeyPath = "HKLM:\SOFTWARE\pGina3"
 
 $multiLineContent = @"
 12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
 0f52390b-c781-43ae-bd62-553c77fa4cf7
 "@
 
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Type MultiString
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorizaation_Order" -Value $multiLineContent -Type MultiString
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Type MultiString
-
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 
 
 
