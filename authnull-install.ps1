@@ -278,27 +278,6 @@ try {
 
 
 
-# Define the registry key path
-$registryKeyPath = "HKLM:\Software\Pgina3"
-
-# Define the name of the multi-string value
-$valueName = "PluginDirectories"
-
-$destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
-# Define the new value data
-$newValueData = @(
-    $destinationDirectory 
-)
-
- 
-
-# Set the multi-string value
-try {
-    Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $newValueData -Type MultiString -Force -Verbose
-    Write-Host "Registry value modified successfully." -ForegroundColor Green
-} catch {
-    Write-Host "Failed to modify registry value: $_" -ForegroundColor Red
-}
 
 #force restart pgina service
 Write-Host "Restarting pgina: $_" -ForegroundColor Green
@@ -311,4 +290,117 @@ Restart-Service -Name "pGina" -Force
 
 # Start the process again
 Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe"
+
+
+#Update other registry items for active directory plugin
+
+
+# Define the registry key path
+$registryKeyPath = "HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
+
+# Define the name of the multi-string value
+$valueName =   Read-Host "Please enter a DN pattern"
+
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+
+
+Set-ItemProperty -Path $registryKeyPath -Name "DnPattern" -Value "NewValue"
+
+ 
+
+# Define the name of the multi-string value
+$valueName =   Read-Host "Please enter a DN pattern"
+
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+
+
+Set-ItemProperty -Path $registryKeyPath -Name "DnPattern" -Value $newValueData
+
+
+# Define the registry key path
+$registryKeyPath = "HKLM:\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
+
+# Define the name of the multi-string value\\
+
+$valueName =   Read-Host "Please enter a search DN pattern"
+
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+
+
+
+Set-ItemProperty -Path $registryKeyPath -Name "SearchDN" -Value  $newValueData
+
+ 
+$valueName =   Read-Host "Please enter a DN pattern"
+
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+
+
+Set-ItemProperty -Path $registryKeyPath -Name "DnPattern" -Value  $newValueData
+
+ 
+
+ 
+
+# Define the name of the multi-string value
+$valueName =   Read-Host "Please enter a Group DN pattern"
+
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+
+Set-ItemProperty -Path $registryKeyPath -Name "GroupDNPattern" -Value $newValueData 
+
+
+
+ 
+
+# Define the name of the multi-string value
+
+
+Set-ItemProperty -Path $registryKeyPath -Name "GroupGatewayRules" -Value "Users0administrators"
+
+$valueName =   Read-Host "Please enter a LDAP Host URL"
+
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+
+Set-ItemProperty -Path $registryKeyPath -Name "LdapHost" -Value $newValueData 
+
+
+ 
+Write-Host "Configured LDAP Successfully.." -ForegroundColor Red
+ 
+
+$registryKeyPath = "HKLM:\SOFTWARE\pGina3\Plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d"
+
+Set-ItemProperty -Path $registryKeyPath -Name "AlwaysAuthenticate" -Value "false" 
+
+Set-ItemProperty -Path $registryKeyPath -Name "ApplyAuthZtoAllUsers" -Value "true" 
+
+Set-ItemProperty -Path $registryKeyPath -Name "ScramblePasswordsWhenLMAuthFails" -Value "false" 
+
+
+Set-ItemProperty -Path $registryKeyPath -Name "AuthZLocalGroupsOnly" -Value "false" 
+
+
+Write-Host "Disabling network level authentication.." -ForegroundColor Green
+
+Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0
+
 
