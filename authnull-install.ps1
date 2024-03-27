@@ -53,7 +53,7 @@ else {
 }
 
 
-$InstallerPath= $OutputPath + "\Windows-endpoint-main\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+$InstallerPath= $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 
 
  
@@ -63,7 +63,6 @@ if (-not $InstallerPath) {
 } 
  
 
-#$InstallerPath="C:\Downloads\Windows-endpoint-main\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 
 # Check if the installer executable exists
 if (Test-Path $InstallerPath) {
