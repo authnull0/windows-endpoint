@@ -184,7 +184,7 @@ Write-Host "Script execution completed." -ForegroundColor Cyan
 
 Write-Host "Extracting agent"
 
-$AgentPath= $OutputPath + "\Windows-endpoint-main\windows-endpoint-main\agent\windows-build.zip"
+$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build.zip"
 
 
 
@@ -202,7 +202,7 @@ if (Test-Path $AgentPath) {
     }
 
 #reusing agent path
-$AgentPath= $OutputPath + "\Windows-endpoint-main\windows-endpoint-main\agent\windows-build\windows-build\windows-agent-amd64.exe"
+$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build\windows-build\windows-agent-amd64.exe"
 
 
 
@@ -224,7 +224,7 @@ finally {
 #copy plugins 
 
 # Define the source directory path
-$sourceDirectory = $OutputPath + "\Windows-endpoint-main\windows-endpoint-main\credential-provider\plugins" 
+$sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\plugins" 
 
 # Define the destination directory path
 Write-Host "Copying plugins... please wait" -ForegroundColor Red
@@ -248,7 +248,7 @@ Write-Host "Copied files successfully to the plugin folder. Open Pgina and confi
 
 #copy depedency dlls
 Write-Host "Copying dependencies .." -ForegroundColor Green
-$sourceDirectory = $OutputPath + "\windows-endpoint-main\windows-endpoint-main\credential-provider\dll-dependencies" 
+$sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\dll-dependencies" 
 $destinationDirectory = "C:\program files\system32" 
 
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
