@@ -81,7 +81,7 @@ Write-Host "Copied files successfully to the publish folder.." -ForegroundColor 
 
 
 # Define the path for the conf file
-$confFilePath = "C:\authnull-ad-agent\ad.conf"
+$confFilePath = "C:\authnull-ad-agent\agent.conf"
 
 # Prompt the user for input
 Write-Host "Please copy and paste the content for the conf file. Press Enter twice to finish." -ForegroundColor DarkGreen
