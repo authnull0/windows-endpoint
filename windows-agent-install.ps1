@@ -26,7 +26,7 @@ if (-not (Test-Path -Path $OutputPath -PathType Container)) {
 }
 #-------------------------------------------------------------------------------------
 # Define the URL of the file to download
-$url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/main.zip"
+$url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/windows-agent.zip"
 
 # Download the file
 
