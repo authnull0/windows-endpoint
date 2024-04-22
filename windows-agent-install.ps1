@@ -263,8 +263,8 @@ Write-Host "Copied dependencies successfully" -ForegroundColor Green
 #----------------------------------------------------------
 #updating group policy to enable and disable respective credential providers
 # Define paths
-$lgpoPath = "C:\authnull-agent\GPO\LGPO.exe"
-$backupFolder = "C:\authnull-agent\GPO\registry.pol"
+$lgpoPath = $OutputPath+"\windows-endpoint\gpo\LGPO.exe"
+$backupFolder = $OutputPath+"\windows-endpoint\gpo\registry.pol"
 
 # Step 1: Create a backup of current group policy settings
 Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
@@ -332,3 +332,6 @@ Write-Host "LDAP configuration updated successfully." -ForegroundColor Green
 Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe"
 
 #------------------------------------------------------------------------------------------------------------------------------------
+#Restart Computer
+
+Restart-Computer -Force
