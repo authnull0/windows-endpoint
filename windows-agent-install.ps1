@@ -50,11 +50,79 @@ try {
 }
 else {
     Write-Host "Zip file not found at: $OutputPath\file.zip" -ForegroundColor Red
+
 }
+#write c:\authnull-agent folder and write app.env file
+# Define the path where the environment file should be saved
+$envFilePath = $OutputPath+ "\app.env"
+
+# Ask for the content of the environment file
+$envContent = Read-Host "Enter the content of the environment file (press Enter twice to finish):"
+
+
+# Prompt the user for input
+$envContent = ""
+do {
+    $line = Read-Host
+    if (-not [string]::IsNullOrEmpty($line)) {
+        $envContent += "$line`n" # Append the line to the text blob
+    }
+} while (-not [string]::IsNullOrEmpty($line))
+
+# Write the text blob to the text file
+try {
+   # $envContent | Out-File -FilePath $agentFile -Encoding utf8
+    if (-not [string]::IsNullOrEmpty($envContent)) {
+        $envContent | Out-File -FilePath $envFilePath -Encoding utf8
+        Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
+    } else {
+        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "Failed to save Config: $_" -ForegroundColor Red
+}
+#----------------------------------------------------------------------
+Write-Host "Extracting agent"
+
+$AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build.zip"
+
+
+
+if (Test-Path $AgentPath) {
+    # Extract the file
+        try {
+            Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
+            Write-Host "Extraction completed successfully." -ForegroundColor Green
+        } catch {
+            Write-Host "Extraction failed: $_" -ForegroundColor Red
+        }
+    } 
+    else {
+        Write-Host "Zip file not found at: $zipFilePath" -ForegroundColor Red
+    }
+
+#reusing agent path
+$AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build\windows-agent-amd64.exe"
+
+
+
+Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
+
+try {
+    New-Service -Name "AuthNullAgent" -BinaryPathName $OutputPath+"\windows-agent-amd64.exe" 
+
+    Start-Service AuthNullAgent -WarningAction SilentlyContinue
+} catch {
+    Write-Host "Registering AuthNull Agent failed!" -ForegroundColor Red
+}
+finally {
+    # Do this after the try block regardless of whether an exception occurred or not
+}
+
 
 #-----------------------------------------------------------------------
 #Installing pGina
-$InstallerPath= $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+$InstallerPath= $OutputPath + "\windows-endpoint-windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 
 
  
@@ -138,99 +206,12 @@ else {
 
 #-----------------------------------------------------------------------
 
-#write c:\authnull-agent folder and write app.env file
-# Define the path where the environment file should be saved
-$envFilePath = "C:\authnull-agent\app.env"
-
-# Ask for the content of the environment file
-$envContent = Read-Host "Enter the content of the environment file (press Enter twice to finish):"
-
-
-# Prompt the user for input
-$envContent = ""
-do {
-    $line = Read-Host
-    if (-not [string]::IsNullOrEmpty($line)) {
-        $envContent += "$line`n" # Append the line to the text blob
-    }
-} while (-not [string]::IsNullOrEmpty($line))
-
-# Write the text blob to the text file
-try {
-   # $envContent | Out-File -FilePath $agentFile -Encoding utf8
-    if (-not [string]::IsNullOrEmpty($envContent)) {
-        $envContent | Out-File -FilePath $envFilePath -Encoding utf8
-        Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
-    } else {
-        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
-    }
-} catch {
-    Write-Host "Failed to save Config: $_" -ForegroundColor Red
-}
-
-<# Create or overwrite the environment file with the provided content
-try {
-
-    if (-not [string]::IsNullOrEmpty($envContent)) {
-        $envContent | Out-File -FilePath $envFilePath -Encoding utf8
-        Write-Host "Environment file saved successfully to: $envFilePath" -ForegroundColor Green
-    } else {
-        Write-Host "The content to be written to the file is null or empty." -ForegroundColor Yellow
-    }
-    
-} catch {
-    Write-Host "Failed to save environment file: $_" -ForegroundColor Red
-}
-#>
-
-#----------------------------------------------------------------------
-# Log using high verbosity
-Write-Host "Script execution completed." -ForegroundColor Cyan
-
-
-Write-Host "Extracting agent"
-
-$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build.zip"
-
-
-
-if (Test-Path $AgentPath) {
-    # Extract the file
-        try {
-            Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
-            Write-Host "Extraction completed successfully." -ForegroundColor Green
-        } catch {
-            Write-Host "Extraction failed: $_" -ForegroundColor Red
-        }
-    } 
-    else {
-        Write-Host "Zip file not found at: $zipFilePath" -ForegroundColor Red
-    }
-
-#reusing agent path
-$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build\windows-agent-amd64.exe"
-
-
-
-Copy-Item -Path $AgentPath -Destination "C:\authnull-agent" -Force -Verbose
-
-try {
-    New-Service -Name "AuthNullAgent" -BinaryPathName "C:\authnull-agent\windows-agent-amd64.exe" 
-
-    Start-Service AuthNullAgent -WarningAction SilentlyContinue
-} catch {
-    Write-Host "Registering AuthNull Agent failed!" -ForegroundColor Red
-}
-finally {
-    # Do this after the try block regardless of whether an exception occurred or not
-}
-
 #--------------------------------------------------------------------------
 
 #copy plugins 
 
 # Define the source directory path
-$sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\plugins" 
+$sourceDirectory = $OutputPath + "\windows-endpoint-windows-agent\credential-provider\plugins" 
 
 # Define the destination directory path
 Write-Host "Copying plugins... please wait" -ForegroundColor Red
@@ -254,7 +235,7 @@ Write-Host "Copied files successfully to the plugin folder. Open Pgina and confi
 
 #copy depedency dlls
 Write-Host "Copying dependencies .." -ForegroundColor Green
-$sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\dll-dependencies" 
+$sourceDirectory = $OutputPath + "\windows-endpoint-windows-agent\credential-provider\dll-dependencies" 
 $destinationDirectory = "C:\program files\system32" 
 
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
@@ -263,8 +244,8 @@ Write-Host "Copied dependencies successfully" -ForegroundColor Green
 #----------------------------------------------------------
 #updating group policy to enable and disable respective credential providers
 # Define paths
-$lgpoPath = $OutputPath+"\windows-endpoint\gpo\LGPO.exe"
-$backupFolder = $OutputPath+"\windows-endpoint\gpo\registry.pol"
+$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
+$backupFolder = $OutputPath+"\windows-endpoint-windows-agent\gpo\registry.pol"
 
 # Step 1: Create a backup of current group policy settings
 Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
@@ -327,11 +308,41 @@ Set-ItemProperty -Path $ldapRegistryPath -Name "SearchDn" -Value "CN=%u,CN=Users
 
 Write-Host "LDAP configuration updated successfully." -ForegroundColor Green
 #-----------------------------------------------------------------------------------------------------------------------------
+#set credential provider options 
+$CredProvider = "HKLM:\SOFTWARE\pGina3"
 
+$multiCredProviderContent = @"
+{1b283861-754f-4022-ad47-a5eaaa618894}	3
+{1ee7337f-85ac-45e2-a23c-37c753209769}	3
+{2135f72a-90b5-4ed3-a7f1-8bb705ac276a}	3
+{25cbb996-92ed-457e-b28c-4774084bd562}	3
+{27fbdb57-b613-4af2-9d7e-4fa7a66c21ad}	3
+{3dd6bec0-8193-4ffe-ae25-e08e39ea4063}	3
+{48b4e58d-2791-456c-9091-d524c6c706f2}	3
+{600e7adb-da3e-41a4-9225-3c0399e88c0c}	3
+{60b78e88-ead8-445c-9cfd-0b87f74ea6cd}	3
+{8fd7e19c-3bf7-489b-a72c-846ab3678c96}	3
+{94596c7e-3744-41ce-893e-bbf09122f76a}	3
+{bec09223-b018-416d-a0ac-523971b639f5}	3
+{c5d7540a-cd51-453b-b22b-05305ba03f07}	3
+{cb82ea12-9f71-446d-89e1-8d0924e1256e}	3
+{d6886603-9d2f-4eb2-b667-1971041fa96b}	3
+{e74e57b0-6c6d-44d5-9cda-fb2df5ed7435}	3
+{f64945df-4fa9-4068-a2fb-61af319edd33}	3
+{f8a0b131-5f68-486c-8040-7e8fc3c85bb6}	3
+{f8a1793b-7873-4046-b2a7-1f318747f427}	3
+"@
+
+#Set-ItemProperty -Path $CredProvider -Name "CredentialProviderDefaultTile" -Value "True" -Force -Verbose -Type string
+Set-ItemProperty -Path $CredProvider -Name "CredentialProviderFilters" -Value $multiCredProviderContent -Force -Verbose -Type MultiString
+
+
+
+#-----------------------------------------------------------------------------------------------------------
 # Start the process again
-Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe"
+Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
 
 #------------------------------------------------------------------------------------------------------------------------------------
 #Restart Computer
 
-Restart-Computer -Force
+#Restart-Computer -Force
