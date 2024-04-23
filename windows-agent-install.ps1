@@ -46,7 +46,7 @@ catch{
 
 
 # Check if pGina already installed
-$uninstallPath = "C:\Program Files\YourAppName\unins000.exe"
+$uninstallPath = "C:\Program Files\pGina\unins000.exe"
 
 # Check if the uninstaller executable exists
 if (Test-Path $uninstallPath -PathType Leaf) {
