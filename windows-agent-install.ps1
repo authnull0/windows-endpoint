@@ -1,6 +1,4 @@
 #single file
-
-
 param (
     [string]$OutputPath
 )
@@ -10,19 +8,67 @@ if (-not $OutputPath) {
     Write-Host "Please provide the path where you want to save the downloaded file using the -OutputPath parameter." -ForegroundColor Yellow
     exit
 }
-
+#-----------------------------------------------------------------------
+#Cleaning the System 
 # Check if the output directory exists; if not, create it
-if (-not (Test-Path -Path $OutputPath -PathType Container)) {
+if (Test-Path -Path $OutputPath -PathType Container) {
     try {
-        New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
-        Write-Host "Created directory: $OutputPath" -ForegroundColor Green
+        Write-Host "Directory already exist. Deleting and recreating it.." -ForegroundColor Red
+        Remove-Item -Path $OutputPath -Recurse -Force -ErrorAction SilentlyContinue
+        
     } catch {
-        Write-Host "Failed to create directory: $_" -ForegroundColor Red
+        Write-Host "Failed to delete directory: $_" -ForegroundColor Red
         exit
     }
+
+    try{
+        Write-Host "Creating a new directory.." -ForegroundColor Yellow
+        New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
+        Write-Host "Created directory: $OutputPath" -ForegroundColor Green   
+}
+catch{
+    Write-Host "Failed to create directory: $_ " -ForegroundColor Red
+
+}
+
+    }
+
+ else {
+    try{
+        Write-Host "Creating a new directory.." -ForegroundColor Yellow
+        New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
+        Write-Host "Created directory: $OutputPath" -ForegroundColor Green   
+}
+catch{
+    Write-Host "Failed to create directory: $_ " -ForegroundColor Red
+}
+}
+
+
+# Check if pGina already installed
+$uninstallPath = "C:\Program Files\YourAppName\unins000.exe"
+
+# Check if the uninstaller executable exists
+if (Test-Path $uninstallPath -PathType Leaf) {
+    # Start the uninstaller process
+    Write-Host "Uninstalling the already configured pGina" -ForegroundColor Yellow
+    Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -Wait
+    Write-Host "pGina uninstalled successfully." -ForegroundColor Green
 } else {
-    Write-Host "Output directory already exists...downloading now" -ForegroundColor Yellow
-    
+    Write-Host "Uninstaller not found at $uninstallPath." -ForegroundColor Red
+}
+
+$pginaPath = "C:\Program Files\pGina"
+
+if(Test-Path $pginaPath)
+{
+    try{
+        Remove-Item -Path $pginaPath -Force -Recurse -WarningAction SilentlyContinue
+        Write-Host "Pgina folder in C Drive removed sucessfully..." -ForegroundColor Green
+    }
+    catch{
+        Write-Host "Pgina folder cannot be deleted: $_" -ForegroundColor Red 
+    }
 }
 #-------------------------------------------------------------------------------------
 # Define the URL of the file to download
@@ -52,7 +98,8 @@ else {
     Write-Host "Zip file not found at: $OutputPath\file.zip" -ForegroundColor Red
 
 }
-#write c:\authnull-agent folder and write app.env file
+
+#---------------------------------------------------------------------------------
 # Define the path where the environment file should be saved
 $envFilePath = $OutputPath+ "\app.env"
 
@@ -154,6 +201,18 @@ else {
     Write-Host "Installer not found at: $InstallerPath" -ForegroundColor Red
 }
 
+Write-Host "Closing pGina" -ForegroundColor Yellow
+# Get the process associated with pGina
+$pginaProcess = Get-Process -Name "pGina.Configuration"
+
+# Check if the pGina process exists
+if ($pginaProcess) {
+    # Terminate the pGina process
+    $pginaProcess | Stop-Process -Force
+    Write-Host "pGina application closed successfully." -ForegroundColor Green
+} else {
+    Write-Host "pGina application is not running." -ForegroundColor Yellow
+}
 
 #-------------------------------------------------------------------------------------
 
@@ -203,11 +262,7 @@ if (Test-Path $machineConfigPath) {
 else {
     Write-Host "Machine.config file not found at: $machineConfigPath" -ForegroundColor Red
 }
-
-#-----------------------------------------------------------------------
-
 #--------------------------------------------------------------------------
-
 #copy plugins 
 
 # Define the source directory path
@@ -241,7 +296,7 @@ $destinationDirectory = "C:\program files\system32"
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
 Write-Host "Copied dependencies successfully" -ForegroundColor Green
 
-#----------------------------------------------------------
+#---------------------------------------------------------------------
 #updating group policy to enable and disable respective credential providers
 # Define paths
 $lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
@@ -250,95 +305,43 @@ $backupFolder = $OutputPath+"\windows-endpoint-windows-agent\gpo\registry.pol"
 # Step 1: Create a backup of current group policy settings
 Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
 gpupdate /force
+#--------------------------------------------------------------------------------
+Write-Host "Configuring pGina for LDAP.." -ForegroundColor Yellow 
+#Configuring PGina for Local Users and LDAP
+$regFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\pginaRegistryLDAP.reg"
 
+# Check if the file exists
+if (Test-Path $regFilePath) {
+    # Import the .reg file using regedit.exe
+    Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
+    Write-Host "LDAP Registry file imported successfully." -ForegroundColor Green
+} else {
+    Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
+}
 #----------------------------------------------------------------------------
-#plugin directory
-# Define the registry key path
-$registryKeyPath = "HKLM:\Software\Pgina3"
 
-# Define the name of the multi-string value
-$valueName = "PluginDirectories"
+Write-Host "Enter Y to configure for local users or enter N..." -ForegroundColor Green
+$options = Read-Host 
+if ($options -eq 'Y')
+{
+#Configuring PGina for Local Users and LDAP
+$regFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\pginaRegistryLocalUser.reg"
 
-$destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
-Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDirectory -Force -Verbose -Type MultiString 
-Write-Host "Plugin selection - search directory modified successfully..." -ForegroundColor Green
+# Check if the file exists
+if (Test-Path $regFilePath) {
+    # Import the .reg file using regedit.exe
+    Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
+    Write-Host "Local User Registry file imported successfully." -ForegroundColor Green
+} else {
+    Write-Host "Local User Registry file not found at $regFilePath." -ForegroundColor Red
+}
 
-#------------------------------------------------------------------------------------------
-#current plugins
-# Define the registry key path
-$registryKeyPath = "HKLM:\Software\Pgina3"
-$hexaValue=0x0000000e
+}
+else {
+Write-Host "Configuring LDAP only..." -ForegroundColor Green
 
-# Define the name of the multi-string value
-
-Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value $hexaValue -Force -Verbose -Type DWORD 
-Set-ItemProperty -Path $registryKeyPath -Name "12FA152D-A2E3-4C8D-9535-5DCD49DFCB6D" -Value $hexaValue -Force -Verbose -Type DWORD 
-
-Write-Host "Plugin selection - Current plugins selected successfully..." -ForegroundColor Green
-#---------------------------------------------------------------------------------------------------------
-
-#verify the plugins order
-$registryKeyPath = "HKLM:\SOFTWARE\pGina3"
-
-$multiLineContent = @"
-0f52390b-c781-43ae-bd62-553c77fa4cf7
-12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
-"@
-
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-#Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-#-----------------------------------------------------------------------------------------
-
-# Step 3: Verify LDAP authentication configuration
-$ldapRegistryPath = "HKLM:\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
-
-# Set LDAP server address and port in the registry
-$ldapRegistryPath = "HKLM:\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
-Set-ItemProperty -Path $ldapRegistryPath -Name "LdapHost" -Value "10.0.0.4" -Force
-
-Set-ItemProperty -Path $ldapRegistryPath -Name "GroupDnPattern" -Value "cn=Users,cn=Authnull2,cn=com,CN=%u,CN=Users,DC=authnull2,DC=com" -Force -Verbose
-
-Set-ItemProperty -Path $ldapRegistryPath -Name "DnPattern" -Value "CN=%u,CN=Users,DC=authnull2,DC=com" -Force -Verbose
-
-Set-ItemProperty -Path $ldapRegistryPath -Name "SearchDn" -Value "CN=%u,CN=Users,DC=authnull2,DC=com" -Force -Verbose
-
-#Set-ItemProperty -Path $ldapRegistryPath -Name "LdapPort" -Value 389 -Force -Verbose -Type 
-
-Write-Host "LDAP configuration updated successfully." -ForegroundColor Green
-#-----------------------------------------------------------------------------------------------------------------------------
-#set credential provider options 
-$CredProvider = "HKLM:\SOFTWARE\pGina3"
-
-$multiCredProviderContent = @"
-{1b283861-754f-4022-ad47-a5eaaa618894}	3
-{1ee7337f-85ac-45e2-a23c-37c753209769}	3
-{2135f72a-90b5-4ed3-a7f1-8bb705ac276a}	3
-{25cbb996-92ed-457e-b28c-4774084bd562}	3
-{27fbdb57-b613-4af2-9d7e-4fa7a66c21ad}	3
-{3dd6bec0-8193-4ffe-ae25-e08e39ea4063}	3
-{48b4e58d-2791-456c-9091-d524c6c706f2}	3
-{600e7adb-da3e-41a4-9225-3c0399e88c0c}	3
-{60b78e88-ead8-445c-9cfd-0b87f74ea6cd}	3
-{8fd7e19c-3bf7-489b-a72c-846ab3678c96}	3
-{94596c7e-3744-41ce-893e-bbf09122f76a}	3
-{bec09223-b018-416d-a0ac-523971b639f5}	3
-{c5d7540a-cd51-453b-b22b-05305ba03f07}	3
-{cb82ea12-9f71-446d-89e1-8d0924e1256e}	3
-{d6886603-9d2f-4eb2-b667-1971041fa96b}	3
-{e74e57b0-6c6d-44d5-9cda-fb2df5ed7435}	3
-{f64945df-4fa9-4068-a2fb-61af319edd33}	3
-{f8a0b131-5f68-486c-8040-7e8fc3c85bb6}	3
-{f8a1793b-7873-4046-b2a7-1f318747f427}	3
-"@
-
-#Set-ItemProperty -Path $CredProvider -Name "CredentialProviderDefaultTile" -Value "True" -Force -Verbose -Type string
-Set-ItemProperty -Path $CredProvider -Name "CredentialProviderFilters" -Value $multiCredProviderContent -Force -Verbose -Type MultiString
-
-
-
-#-----------------------------------------------------------------------------------------------------------
+}
+#--------------------------------------------------------------------------------------------------
 # Start the process again
 Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
 
