@@ -50,10 +50,15 @@ $uninstallPath = "C:\Program Files\pGina\unins000.exe"
 
 # Check if the uninstaller executable exists
 if (Test-Path $uninstallPath -PathType Leaf) {
+    try{
     # Start the uninstaller process
     Write-Host "Uninstalling the already configured pGina" -ForegroundColor Yellow
     Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -Wait
     Write-Host "pGina uninstalled successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "Uninstalling Pgina Failed: $_" -ForegroundColor Red
+}
 } else {
     Write-Host "Uninstaller not found at $uninstallPath." -ForegroundColor Red
 }
@@ -75,15 +80,26 @@ $keyPath = "HKLM:\Software\pGina3"
 
 # Check if the registry key exists
 if (Test-Path -Path $keyPath) {
-    # Get all values under the registry key
-    $values = Get-ItemProperty -Path $keyPath | ForEach-Object { $_.PSObject.Properties.Name }
+$RegistryKeyPath = "HKLM:\SOFTWARE\pGina3"
+# Check if the registry key exists
+if (Test-Path -Path $RegistryKeyPath) {
+    try{
+    # Remove the registry key and all its subkeys and values
+    Remove-Item -Path $RegistryKeyPath -Recurse -Force
+    Write-Host "Registry key and all subkeys and values deleted successfully." -ForegroundColor Green
+    }
 
-    # Delete each value under the registry key
-    foreach ($valueName in $values) {
-        Remove-ItemProperty -Path $keyPath -Name $valueName -ErrorAction Silentlycontinue
-          }
-    Write-Host "All values under pGina3 registry key '$keyPath' deleted successfully.." -ForegroundColor Green
-} else {
+    catch{
+        Write-Host "Failed to delete pgina registry keys and values: $_" -ForegroundColor Red
+    }
+
+} 
+else {
+    Write-Host "Registry key does not exist." -ForegroundColor Yellow
+}
+
+    } 
+else {
     Write-Host "Registry key '$keyPath' not found." -ForegroundColor Yellow
 }
 #-------------------------------------------------------------------------------------
@@ -134,7 +150,7 @@ do {
 
 # Write the text blob to the text file
 try {
-   # $envContent | Out-File -FilePath $agentFile -Encoding utf8
+   
     if (-not [string]::IsNullOrEmpty($envContent)) {
         $envContent | Out-File -FilePath $envFilePath -Encoding utf8
         Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
@@ -144,12 +160,10 @@ try {
 } catch {
     Write-Host "Failed to save Config: $_" -ForegroundColor Red
 }
-#----------------------------------------------------------------------
+#---------------------------------------------------------------------------
 Write-Host "Extracting agent"
 
 $AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build.zip"
-
-
 
 if (Test-Path $AgentPath) {
     # Extract the file
@@ -179,21 +193,25 @@ finally {
     # Do this after the try block regardless of whether an exception occurred or not
 }
 
+#-------------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------
 #Installing pGina
 $InstallerPath= $OutputPath + "\windows-endpoint-windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 
-
- 
 if (-not $InstallerPath) {
     Write-Host "Installation path does not exist" -ForegroundColor Yellow
     exit
 } 
- 
-
-
-# Check if the installer executable exists
+ # Check if the installer executable exists
+if (Test-Path $InstallerPath) {
+#Installing pGina
+$InstallerPath= $OutputPath + "\windows-endpoint-windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+Write-Host "After installation completed please CLOSE the pGina" -ForegroundColor Yellow
+if (-not $InstallerPath) {
+    Write-Host "Installation path does not exist" -ForegroundColor Yellow
+    exit
+} 
+ # Check if the installer executable exists
 if (Test-Path $InstallerPath) {
     try {
         # Start the installation process
@@ -214,18 +232,11 @@ else {
     Write-Host "Installer not found at: $InstallerPath" -ForegroundColor Red
 }
 
-# Get the process associated with pGina
-$pginaProcess = Get-Process -Name "pGina.Configuration"
 
-# Check if the pGina process exists
-if ($pginaProcess) {
-    # Terminate the pGina process
-    $pginaProcess | Stop-Process -Force
-    Write-Host "pGina application closed successfully." -ForegroundColor Green
-} else {
-    Write-Host "pGina application is not running." -ForegroundColor Yellow
+} 
+else {
+    Write-Host "Installer not found at: $InstallerPath" -ForegroundColor Red
 }
-
 #-------------------------------------------------------------------------------------
 
 #modify machine config
@@ -281,7 +292,7 @@ else {
 $sourceDirectory = $OutputPath + "\windows-endpoint-windows-agent\credential-provider\plugins" 
 
 # Define the destination directory path
-Write-Host "Copying plugins... please wait" -ForegroundColor Red
+Write-Host "Copying plugins... please wait" -ForegroundColor Yellow
 $destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
 
 # Check if the directory exists; if not, create it
@@ -294,33 +305,26 @@ if (-not (Test-Path -Path  $destinationDirectory -PathType Container)) {
         exit
     }
 }
-#--------------------------------------------------------------------
+
 # Copy files from source directory to destination directory
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
-Write-Host "Copied files successfully to the plugin folder. Open Pgina and configure plugins.." -ForegroundColor Green
+Write-Host "Copied files successfully to the plugin folder." -ForegroundColor Green
 
 
+#-------------------------------------------------------------------------------------
 #copy depedency dlls
 Write-Host "Copying dependencies .." -ForegroundColor Green
 $sourceDirectory = $OutputPath + "\windows-endpoint-windows-agent\credential-provider\dll-dependencies" 
 $destinationDirectory = "C:\program files\system32" 
 
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
-Write-Host "Copied dependencies successfully" -ForegroundColor Green
+Write-Host "Copied dependencies successfully." -ForegroundColor Green
 
 #---------------------------------------------------------------------
-#updating group policy to enable and disable respective credential providers
-# Define paths
-$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
-$backupFolder = $OutputPath+"\windows-endpoint-windows-agent\gpo\registry.pol"
-
-# Step 1: Create a backup of current group policy settings
-Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
-gpupdate /force -ForegroundColor Green
-#--------------------------------------------------------------------------------
 Write-Host "Configuring pGina for LDAP.." -ForegroundColor Yellow 
-#Configuring PGina for Local Users and LDAP
+#Configuring PGina for LDAP
 $regFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\pginaRegistryLDAP.reg"
+try{
 
 # Check if the file exists
 if (Test-Path $regFilePath) {
@@ -330,15 +334,21 @@ if (Test-Path $regFilePath) {
 } else {
     Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
 }
-#----------------------------------------------------------------------------
+}
+catch{
+    Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
+}
 
-Write-Host "Enter Y to configure for local users or enter N..." -ForegroundColor Green
+#-----------------------------------------------------------------------------------
+
+
+Write-Host "Enter Y to configure for local users Or Enter N..." -ForegroundColor Green
 $options = Read-Host 
 if ($options -eq 'Y')
 {
 Write-Host "Configuring PGina for Local Users and LDAP" -ForegroundColor Yellow
 $regFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\pginaRegistryLocalUser.reg"
-
+try{
 if (Test-Path $regFilePath) {
     # Import the .reg file using regedit.exe
     Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
@@ -348,11 +358,28 @@ if (Test-Path $regFilePath) {
 }
 
 }
-else {
-Write-Host "Configuring LDAP only..." -ForegroundColor Green
-
+catch{
+    Write-Host "Failed to configure local user registry: $_" -ForegroundColor Red
 }
+}
+else {
+    Write-Host "Configuring LDAP only..." -ForegroundColor Green
+}
+
+
 #---------------------------------------------------------------------------------------------
+#updating group policy to enable and disable respective credential providers
+
+$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
+$backupFolder = $OutputPath+"\windows-endpoint-windows-agent\gpo\registry.pol"
+try{
+    Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
+    Write-Host "Group policy updated sucessfully." -ForegroundColor Green
+}
+catch{
+    Write-Host "Group policy updation failed: $_" -ForegroundColor Red
+}
+#updating group policy to update seucrity settings
 Write-Host "Do you want to enable local policy configuration for LDAP users to login locally(Optional)? Press Y/N" -ForegroundColor Green
 $securityLocalPolicy = Read-Host 
 $lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
@@ -365,17 +392,24 @@ $backupFolder = $OutputPath + "\windows-endpoint-windows-agent\gpo\securitySetti
         } 
         catch{
             Write-Host "Security Setting installation failed : $_" -ForegroundColor Red
-        
         }
 }
-
-
 #--------------------------------------------------------------------------------------------------
 # Start the process again
+try{
 Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
 Write-Host "Restarting pGina" -ForegroundColor Green
 
+}
+catch{
+    Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
+}
 #------------------------------------------------------------------------------------------------------------------------------------
-#Restart Computer
-
-#Restart-Computer -Force
+<#Restart Computer
+try{
+    Restart-Computer -Force
+}
+catch{
+    Write-Host "Restarting computer failed: $_" -ForegroundColor Red
+}
+#>
