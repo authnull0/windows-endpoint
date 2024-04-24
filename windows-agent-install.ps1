@@ -70,6 +70,22 @@ if(Test-Path $pginaPath)
         Write-Host "Pgina folder cannot be deleted: $_" -ForegroundColor Red 
     }
 }
+#Deleting the pGina3 registry key values
+$keyPath = "HKLM:\Software\pGina3"
+
+# Check if the registry key exists
+if (Test-Path -Path $keyPath) {
+    # Get all values under the registry key
+    $values = Get-ItemProperty -Path $keyPath | ForEach-Object { $_.PSObject.Properties.Name }
+
+    # Delete each value under the registry key
+    foreach ($valueName in $values) {
+        Remove-ItemProperty -Path $keyPath -Name $valueName -ErrorAction Silentlycontinue
+          }
+    Write-Host "All values under pGina3 registry key '$keyPath' deleted successfully.." -ForegroundColor Green
+} else {
+    Write-Host "Registry key '$keyPath' not found." -ForegroundColor Yellow
+}
 #-------------------------------------------------------------------------------------
 # Define the URL of the file to download
 $url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/windows-agent.zip"
@@ -150,9 +166,6 @@ if (Test-Path $AgentPath) {
 
 #reusing agent path
 $AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build\windows-agent-amd64.exe"
-
-
-
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
 
 try {
@@ -201,7 +214,6 @@ else {
     Write-Host "Installer not found at: $InstallerPath" -ForegroundColor Red
 }
 
-Write-Host "Closing pGina" -ForegroundColor Yellow
 # Get the process associated with pGina
 $pginaProcess = Get-Process -Name "pGina.Configuration"
 
@@ -304,7 +316,7 @@ $backupFolder = $OutputPath+"\windows-endpoint-windows-agent\gpo\registry.pol"
 
 # Step 1: Create a backup of current group policy settings
 Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
-gpupdate /force
+gpupdate /force -ForegroundColor Green
 #--------------------------------------------------------------------------------
 Write-Host "Configuring pGina for LDAP.." -ForegroundColor Yellow 
 #Configuring PGina for Local Users and LDAP
@@ -324,10 +336,9 @@ Write-Host "Enter Y to configure for local users or enter N..." -ForegroundColor
 $options = Read-Host 
 if ($options -eq 'Y')
 {
-#Configuring PGina for Local Users and LDAP
+Write-Host "Configuring PGina for Local Users and LDAP" -ForegroundColor Yellow
 $regFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\pginaRegistryLocalUser.reg"
 
-# Check if the file exists
 if (Test-Path $regFilePath) {
     # Import the .reg file using regedit.exe
     Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
@@ -341,9 +352,28 @@ else {
 Write-Host "Configuring LDAP only..." -ForegroundColor Green
 
 }
+#---------------------------------------------------------------------------------------------
+Write-Host "Do you want to enable local policy configuration for LDAP users to login locally(Optional)? Press Y/N" -ForegroundColor Green
+$securityLocalPolicy = Read-Host 
+$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
+$backupFolder = $OutputPath + "\windows-endpoint-windows-agent\gpo\securitySettings.inf"
+    if($securityLocalPolicy -eq 'Y'){
+        try{
+        Start-Process -FilePath $lgpoPath -ArgumentList "/s $backupFolder" -Wait
+        gpupdate /force -ForegroundColor Green
+        Write-Host "Security settings installed successfully." -ForegroundColor Green
+        } 
+        catch{
+            Write-Host "Security Setting installation failed : $_" -ForegroundColor Red
+        
+        }
+}
+
+
 #--------------------------------------------------------------------------------------------------
 # Start the process again
 Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
+Write-Host "Restarting pGina" -ForegroundColor Green
 
 #------------------------------------------------------------------------------------------------------------------------------------
 #Restart Computer
