@@ -6,7 +6,7 @@
 "RequireCert"="False"
 "ServerCertFile"=""
 "SearchDN"="CN=%u,CN=Users,DC=authnull2,DC=com"
-"GroupDnPattern"="cn=Users,cn=Authnull2,cn=com,CN=%u,CN=Users,DC=authnull2,DC=com"
+"GroupDnPattern"="cn=Users,CN=Users,DC=authnull2,DC=com"
 "GroupMemberAttrib"="memberUid"
 "AllowEmptyPasswords"="False"
 "DnPattern"="CN=%u,CN=Users,DC=authnull2,DC=com"
