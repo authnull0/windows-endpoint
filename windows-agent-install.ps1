@@ -133,36 +133,64 @@ else {
 
 #---------------------------------------------------------------------------------
 #Specify the file path where you want to save the content
-$file = $OutputPath + "\app.env"
-
+ 
 # Define the path where the environment file should be saved
-Write-Host "Just copy the app.env file content and press enter(Do not paste here..)" -ForegroundColor Green
 
-$choice = Read-Host
-if($choice -eq ''){
-try{
+if (-not (Test-Path -Path "C:\authnull-agent" -PathType Container)) {
+    try {
+        New-Item -Path "C:\authnull-agent" -ItemType Directory -Force | Out-Null
+        Write-Host "Created directory: C:\authnull-agent" -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to create directory: $_" -ForegroundColor Red
+        exit
+    }
+}
 
-# Get content from the clipboard
-$content = Get-Clipboard
-# Save the content to the file
-Set-Content -Path $file -Value $content
+$envFilePath = "C:\authnull-agent\app.env"
+$envCount=0
+$blank="_"
+Write-Host "Please enter the content for the text file. Press Enter on a blank line to finish. Ensure the first line is not blank."
+$envContent = ""
+do {
+    $line = Read-Host
+    if (-not [string]::IsNullOrEmpty($line)) {
+        $envContent += "$line`n" # Append the line to the text blob
+    } else {
+            $envCount=$envCount+1
+            if ($envCount -gt 1) { 
+                $blank=""
+            }
+    }
+} while (-not [string]::IsNullOrEmpty($blank))
+
+# Define the path for the text file
+$agentFile = "C:\authnull-agent\app.env"
+
+# Write the text blob to the text file
+try {
+    $envContent | Out-File -FilePath $agentFile -Encoding utf8
+    Write-Host "Config saved successfully to: $agentFile" -ForegroundColor Green
+} catch {
+    Write-Host "Failed to save Config: $_" -ForegroundColor Red
+}
+
+# Create or overwrite the environment file with the provided content
+try {
+    $envContent | Out-File -FilePath $envFilePath -Encoding utf8
+    Write-Host "Environment file saved successfully to: $envFilePath" -ForegroundColor Green
+} catch {
+    Write-Host "Failed to save environment file: $_" -ForegroundColor Red
+}
+
+# Log using high verbosity
+Write-Host "Agent env file saving completed." -ForegroundColor Cyan
+
+
+
+ 
 
 # Check if the file exists and if it's empty
-if (Test-Path $file -PathType Leaf) {
-    $fileSize = (Get-Item $file).Length
-    if ($fileSize -eq 0) {
-        Write-Host "The $file is empty after pasting the content." -ForegroundColor Yellow
-    } else {
-        Write-Host "Content saved successfully to $file" -ForegroundColor Green
-    }
-} else {
-    Write-Host "File does not exist." -ForegroundColor Red
-}
-}
-catch{
-    Write-Host "Failed to save content: $_" -ForegroundColor Red
-}
-}
+ 
 #---------------------------------------------------------------------------
 Write-Host "Extracting agent"
 
@@ -185,16 +213,18 @@ if (Test-Path $AgentPath) {
 $AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build\windows-agent-amd64.exe"
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
 
-try {
-    New-Service -Name "AuthNullAgent" -BinaryPathName $OutputPath+"\windows-agent-amd64.exe" 
 
-    Start-Service AuthNullAgent -WarningAction SilentlyContinue
+try {
+    New-Service -Name "AuthNullAgent6" -BinaryPathName $OutputPath"\windows-agent-amd64.exe" 
+    Write-Host "The path of the agent is " $OutputPath "\windows-agent-amd64.exe" 
+    Start-Service AuthNullAgent6 -WarningAction SilentlyContinue
 } catch {
     Write-Host "Registering AuthNull Agent failed!" -ForegroundColor Red
 }
 finally {
     # Do this after the try block regardless of whether an exception occurred or not
 }
+
 
 #-------------------------------------------------------------------------------------
 
