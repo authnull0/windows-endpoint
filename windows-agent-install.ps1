@@ -132,33 +132,36 @@ else {
 }
 
 #---------------------------------------------------------------------------------
+#Specify the file path where you want to save the content
+$file = $OutputPath + "\app.env"
+
 # Define the path where the environment file should be saved
-$envFilePath = $OutputPath+ "\app.env"
+Write-Host "Do you copied the app.env file content? If no, please copy and press enter" -ForegroundColor Green
 
-# Ask for the content of the environment file
-$envContent = Read-Host "Enter the content of the environment file (press Enter twice to finish):"
+$choice = Read-Host
+if($choice -eq ''){
+try{
 
+# Get content from the clipboard
+$content = Get-Clipboard
+# Save the content to the file
+Set-Content -Path $file -Value $content
 
-# Prompt the user for input
-$envContent = ""
-do {
-    $line = Read-Host
-    if (-not [string]::IsNullOrEmpty($line)) {
-        $envContent += "$line`n" # Append the line to the text blob
-    }
-} while (-not [string]::IsNullOrEmpty($line))
-
-# Write the text blob to the text file
-try {
-   
-    if (-not [string]::IsNullOrEmpty($envContent)) {
-        $envContent | Out-File -FilePath $envFilePath -Encoding utf8
-        Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
+# Check if the file exists and if it's empty
+if (Test-Path $file -PathType Leaf) {
+    $fileSize = (Get-Item $file).Length
+    if ($fileSize -eq 0) {
+        Write-Host "The $file is empty after pasting the content." -ForegroundColor Yellow
     } else {
-        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+        Write-Host "Content saved successfully to $file" -ForegroundColor Green
     }
-} catch {
-    Write-Host "Failed to save Config: $_" -ForegroundColor Red
+} else {
+    Write-Host "File does not exist." -ForegroundColor Red
+}
+}
+catch{
+    Write-Host "Failed to save content: $_" -ForegroundColor Red
+}
 }
 #---------------------------------------------------------------------------
 Write-Host "Extracting agent"
@@ -320,10 +323,39 @@ $destinationDirectory = "C:\program files\system32"
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
 Write-Host "Copied dependencies successfully." -ForegroundColor Green
 
+#--------------------------------------------------------------------------
+#updating group policy to enable and disable respective credential providers
+
+$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
+$backupFolder = $OutputPath+"\windows-endpoint-windows-agent\gpo\registry.pol"
+try{
+    Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
+    Write-Host "Group policy updated sucessfully." -ForegroundColor Green
+}
+catch{
+    Write-Host "Group policy updation failed: $_" -ForegroundColor Red
+}
+
+
+
 #---------------------------------------------------------------------
-Write-Host "Configuring pGina for LDAP.." -ForegroundColor Yellow 
+#Configuring pGina
+Write-Host "Do you want to configure Authnull to manage local users? Press Y/N" -ForegroundColor Green
+$choice = Read-Host 
+if($choice -eq 'Y'){
+$registryKeyPath =  "HKLM:\Software\Pgina3"
+
+# Define the name of the multi-string value
+$valueName = "PluginDirectories"
+$destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
+Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDirectory -Force -Verbose -Type MultiString 
+    
+$value = "0x000000e"
+Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value $value -Force -Verbose -Type DWORD 
+Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
+
 #Configuring PGina for LDAP
-$regFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\pginaRegistryLDAP.reg"
+$regFilePath  = "C:\Users\Administrator\Desktop\ldap.reg"
 try{
 
 # Check if the file exists
@@ -339,46 +371,119 @@ catch{
     Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
 }
 
-#-----------------------------------------------------------------------------------
+#plugin order
+$multiLineContent = @"
+12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
+0f52390b-c781-43ae-bd62-553c77fa4cf7
+"@
 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 
-Write-Host "Enter Y to configure for local users Or Enter N..." -ForegroundColor Green
-$options = Read-Host 
-if ($options -eq 'Y')
-{
-Write-Host "Configuring PGina for Local Users and LDAP" -ForegroundColor Yellow
-$regFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\pginaRegistryLocalUser.reg"
+<#disabling the credential provider
+# Define an array of key-value pairs
+$keyValuePairs = @"
+{1b283861-754f-4022-ad47-a5eaaa618894}	3
+{1ee7337f-85ac-45e2-a23c-37c753209769}	3
+{2135f72a-90b5-4ed3-a7f1-8bb705ac276a}	3
+{25cbb996-92ed-457e-b28c-4774084bd562}	3
+{27fbdb57-b613-4af2-9d7e-4fa7a66c21ad}	3
+{3dd6bec0-8193-4ffe-ae25-e08e39ea4063}	3
+{48b4e58d-2791-456c-9091-d524c6c706f2}	3
+{600e7adb-da3e-41a4-9225-3c0399e88c0c}	3
+{60b78e88-ead8-445c-9cfd-0b87f74ea6cd}	3
+{8fd7e19c-3bf7-489b-a72c-846ab3678c96}	3
+{94596c7e-3744-41ce-893e-bbf09122f76a}	3
+{bec09223-b018-416d-a0ac-523971b639f5}	3
+{c5d7540a-cd51-453b-b22b-05305ba03f07}	3
+{cb82ea12-9f71-446d-89e1-8d0924e1256e}	3
+{d6886603-9d2f-4eb2-b667-1971041fa96b}	3
+{e74e57b0-6c6d-44d5-9cda-fb2df5ed7435}	3
+{f64945df-4fa9-4068-a2fb-61af319edd33}	3
+{f8a0b131-5f68-486c-8040-7e8fc3c85bb6}	3
+{f8a1793b-7873-4046-b2a7-1f318747f427}	3
+
+"@
+Write-Host "Registry values have been set successfully."
+#>
+}
+elseif($choice -eq 'N'){
+
+$registryKeyPath =  "HKLM:\Software\Pgina3"
+
+# Define the name of the multi-string value
+$valueName = "PluginDirectories"
+$destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
+Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDirectory -Force -Verbose -Type MultiString 
+    
+#$value = "0x000000e"
+Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value "0x000000e" -Force -Verbose -Type DWORD 
+Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value "0x0000000" -Force -Verbose -Type DWORD 
+
+#configuring LDAP
+$regFilePath  = "C:\Users\Administrator\Desktop\ldap.reg"
 try{
+
+# Check if the file exists
 if (Test-Path $regFilePath) {
     # Import the .reg file using regedit.exe
     Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
-    Write-Host "Local User Registry file imported successfully." -ForegroundColor Green
+    Write-Host "LDAP Registry file imported successfully." -ForegroundColor Green
 } else {
-    Write-Host "Local User Registry file not found at $regFilePath." -ForegroundColor Red
+    Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
 }
-
 }
 catch{
-    Write-Host "Failed to configure local user registry: $_" -ForegroundColor Red
-}
-}
-else {
-    Write-Host "Configuring LDAP only..." -ForegroundColor Green
-}
+    Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
+}#>
+#plugin order
+$multiLineContent = "0f52390b-c781-43ae-bd62-553c77fa4cf7"
+
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 
 
+
+
+<#disabling the credential provider
+# Define an array of key-value pairs
+
+$keyValuePairs = @"
+{1b283861-754f-4022-ad47-a5eaaa618894}	3
+{1ee7337f-85ac-45e2-a23c-37c753209769}	3
+{2135f72a-90b5-4ed3-a7f1-8bb705ac276a}	3
+{25cbb996-92ed-457e-b28c-4774084bd562}	3
+{27fbdb57-b613-4af2-9d7e-4fa7a66c21ad}	3
+{3dd6bec0-8193-4ffe-ae25-e08e39ea4063}	3
+{48b4e58d-2791-456c-9091-d524c6c706f2}	3
+{600e7adb-da3e-41a4-9225-3c0399e88c0c}	3
+{60b78e88-ead8-445c-9cfd-0b87f74ea6cd}	3
+{8fd7e19c-3bf7-489b-a72c-846ab3678c96}	3
+{94596c7e-3744-41ce-893e-bbf09122f76a}	3
+{bec09223-b018-416d-a0ac-523971b639f5}	3
+{c5d7540a-cd51-453b-b22b-05305ba03f07}	3
+{cb82ea12-9f71-446d-89e1-8d0924e1256e}	3
+{d6886603-9d2f-4eb2-b667-1971041fa96b}	3
+{e74e57b0-6c6d-44d5-9cda-fb2df5ed7435}	3
+{f64945df-4fa9-4068-a2fb-61af319edd33}	3
+{f8a0b131-5f68-486c-8040-7e8fc3c85bb6}	3
+{f8a1793b-7873-4046-b2a7-1f318747f427}	3
+
+"@
+
+Set-ItemProperty -Path $registryKeyPath -Name "CredentialProviderFilters" -Value $keyValuePairs -Force -Verbose -Type MultiString 
+#>
+Write-Host "Registry values have been set successfully."
+
+}
+else{
+    Write-Host "Please provide the right choice" -ForegroundColor Red
+}
 #---------------------------------------------------------------------------------------------
-#updating group policy to enable and disable respective credential providers
-
-$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
-$backupFolder = $OutputPath+"\windows-endpoint-windows-agent\gpo\registry.pol"
-try{
-    Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
-    Write-Host "Group policy updated sucessfully." -ForegroundColor Green
-}
-catch{
-    Write-Host "Group policy updation failed: $_" -ForegroundColor Red
-}
 #updating group policy to update seucrity settings
 Write-Host "Do you want to enable local policy configuration for LDAP users to login locally(Optional)? Press Y/N" -ForegroundColor Green
 $securityLocalPolicy = Read-Host 
