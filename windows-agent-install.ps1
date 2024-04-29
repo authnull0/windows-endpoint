@@ -355,7 +355,7 @@ Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
 
 #Configuring PGina for LDAP
-$regFilePath  = "C:\Users\Administrator\Desktop\ldap.reg"
+$regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
 try{
 
 # Check if the file exists
