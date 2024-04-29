@@ -385,7 +385,7 @@ Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
 
 #Configuring PGina for LDAP
-$regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
+#$regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
 try{
 
 # Check if the file exists
@@ -394,11 +394,11 @@ if (Test-Path $regFilePath) {
     Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
     Write-Host "LDAP Registry file imported successfully." -ForegroundColor Green
 } else {
-    Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
+    #Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
 }
 }
 catch{
-    Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
+   # Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
 }
 
 #plugin order
