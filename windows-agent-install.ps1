@@ -136,7 +136,7 @@ else {
 $file = $OutputPath + "\app.env"
 
 # Define the path where the environment file should be saved
-Write-Host "Do you copied the app.env file content? If no, please copy and press enter" -ForegroundColor Green
+Write-Host "Just copy the app.env file content and press enter(Do not paste here..)" -ForegroundColor Green
 
 $choice = Read-Host
 if($choice -eq ''){
