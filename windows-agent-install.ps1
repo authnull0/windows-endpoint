@@ -423,7 +423,7 @@ Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value "0x0000000" -Force -Verbose -Type DWORD 
 
 #configuring LDAP
-$regFilePath  = "C:\Users\Administrator\Desktop\ldap.reg"
+$regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
 try{
 
 # Check if the file exists
