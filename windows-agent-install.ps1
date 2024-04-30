@@ -53,7 +53,7 @@ if (Test-Path $uninstallPath -PathType Leaf) {
     try{
     # Start the uninstaller process
     Write-Host "Uninstalling the already configured pGina" -ForegroundColor Yellow
-    Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -Wait
+    Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -PassThru -Wait 
     Write-Host "pGina uninstalled successfully." -ForegroundColor Green
 }
 catch {
@@ -182,20 +182,21 @@ if (Test-Path $AgentPath) {
     }
 
 #reusing agent path
-$AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build\windows-agent-amd64.exe"
+$AgentPath = $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build\windows-agent-amd64.exe"
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
+$WindowsAgent = $OutputPath + "\windows-agent-amd64.exe" 
 
 try {
-    New-Service -Name "AuthNullAgent" -BinaryPathName $OutputPath+"\windows-agent-amd64.exe" 
+    New-Service -Name "AuthNull1" -BinaryPathName $WindowsAgent
 
-    Start-Service AuthNullAgent -WarningAction SilentlyContinue
+    Start-Service "AuthNull1" -WarningAction SilentlyContinue
 } catch {
     Write-Host "Registering AuthNull Agent failed!" -ForegroundColor Red
 }
 finally {
     # Do this after the try block regardless of whether an exception occurred or not
 }
-
+Get-Service "AuthNull1"
 #-------------------------------------------------------------------------------------
 
 #Installing pGina
@@ -354,7 +355,22 @@ $value = "0x000000e"
 Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value $value -Force -Verbose -Type DWORD 
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
 
-#Configuring PGina for LDAP
+<#configure LDAP
+$keyPath = "HKLM:\Software\Pgina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
+
+$dnPattern = "CN=%u,CN=Users,DC=authnull2,DC=com"
+$groupdnPattern = "cn=Users,cn=Authnull2,cn=com,CN=%u,CN=Users,DC=authnull2,DC=com"
+$ldapHost = "10.0.0.4"
+$ldapPort = "185"
+$searchDN = "CN=%u,CN=Users,DC=authnull2,DC=com"
+
+Set-ItemProperty -Path $keyPath -Name "DnPattern" -Value $dnPattern -Force -Verbose -Type string
+Set-ItemProperty -Path $keyPath -Name "GroupDnPattern" -Value $groupdnPattern -Force -Verbose -Type string
+Set-ItemProperty -Path $keyPath -Name "LdapHost" -Value  $ldapHost -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $keyPath -Name "LdapPort" -Value  $ldapPort  -Force -Verbose -Type DWORD 
+Set-ItemProperty -Path $keyPath -Name "SearchDN" -Value  $searchDN -Force -Verbose -Type string 
+
+<#Configuring PGina for LDAP
 $regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
 try{
 
@@ -370,7 +386,7 @@ if (Test-Path $regFilePath) {
 catch{
     Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
 }
-
+#>
 #plugin order
 $multiLineContent = @"
 12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
@@ -422,7 +438,22 @@ Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDire
 Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value "0x000000e" -Force -Verbose -Type DWORD 
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value "0x0000000" -Force -Verbose -Type DWORD 
 
-#configuring LDAP
+<#configuring LDAP
+$keyPath = "HKLM:\Software\Pgina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
+$dnPattern = "CN=%u,CN=Users,DC=authnull2,DC=com"
+$groupdnPattern = "cn=Users,cn=Authnull2,cn=com,CN=%u,CN=Users,DC=authnull2,DC=com"
+$ldapHost = "10.0.0.4"
+$ldapPort = "185"
+$searchDN = "CN=%u,CN=Users,DC=authnull2,DC=com"
+
+Set-ItemProperty -Path $registryKeyPath -Name "DnPattern" -Value $dnPattern -Force -Verbose -Type string
+Set-ItemProperty -Path $registryKeyPath -Name "GroupDnPattern" -Value $groupdnPattern -Force -Verbose -Type string
+Set-ItemProperty -Path $registryKeyPath -Name "LdapHost" -Value  $ldapHost -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "LdapPort" -Value  $ldapPort  -Force -Verbose -Type DWORD 
+Set-ItemProperty -Path $registryKeyPath -Name "SearchDN" -Value  $searchDN -Force-Verbose -Type string 
+
+
+<#configuring LDAP
 $regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
 try{
 
@@ -438,6 +469,8 @@ if (Test-Path $regFilePath) {
 catch{
     Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
 }#>
+
+
 #plugin order
 $multiLineContent = "0f52390b-c781-43ae-bd62-553c77fa4cf7"
 
