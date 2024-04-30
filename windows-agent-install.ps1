@@ -494,16 +494,17 @@ else{
 #updating group policy to update seucrity settings
 Write-Host "Do you want to enable local policy configuration for LDAP users to login locally(Optional)? Press Y/N" -ForegroundColor Green
 $securityLocalPolicy = Read-Host 
-$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
-$backupFolder = $OutputPath + "\windows-endpoint-windows-agent\gpo\securitySettings.inf"
+$lgpoPath =$OutputPath + "\windows-endpoint-windows-agent\gpo\LGPO.exe"
+$infFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\security.inf"
     if($securityLocalPolicy -eq 'Y'){
         try{
-        Start-Process -FilePath $lgpoPath -ArgumentList "/s $backupFolder" -Wait
-        gpupdate /force -ForegroundColor Green
+        Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
+        #gpupdate /force -ForegroundColor Green
+
         Write-Host "Security settings installed successfully." -ForegroundColor Green
         } 
         catch{
-            Write-Host "Security Setting installation failed : $_" -ForegroundColor Red
+            Write-Host "Security setting installation failed : $_" -ForegroundColor Red
         }
 }
 #--------------------------------------------------------------------------------------------------
