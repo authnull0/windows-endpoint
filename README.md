@@ -6,3 +6,5 @@ This folder contains
 - dependencies - any other dependencies.
 - lgpo.exe - command line tool can import/export group policy
 - .pol - contains the respective group policies for user onboarding  
+-.inf - contains the local security policy settings
+  
