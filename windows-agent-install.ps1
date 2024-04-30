@@ -190,14 +190,6 @@ try {
 } catch {
     Write-Host "Failed to save Config: $_" -ForegroundColor Red
 }
-# Log using high verbosity
-Write-Host "Agent env file saving completed." -ForegroundColor Cyan
-
-
-
- 
-
-# Check if the file exists and if it's empty
  
 #---------------------------------------------------------------------------
 Write-Host "Extracting agent"
@@ -223,15 +215,16 @@ Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
 
 
 try {
-    New-Service -Name "AuthNullAgent6" -BinaryPathName $OutputPath"\windows-agent-amd64.exe" 
-    Write-Host "The path of the agent is " $OutputPath "\windows-agent-amd64.exe" 
-    Start-Service AuthNullAgent6 -WarningAction SilentlyContinue
+    New-Service -Name "AuthNullAgent" -BinaryPathName $OutputPath"\windows-agent-amd64.exe" 
+    Start-Service AuthNullAgent -WarningAction SilentlyContinue
 } catch {
     Write-Host "Registering AuthNull Agent failed!" -ForegroundColor Red
 }
 finally {
     # Do this after the try block regardless of whether an exception occurred or not
 }
+Get-Service AuthNullAgent
+Write-Host "The path of the agent is " $OutputPath"\windows-agent-amd64.exe" -ForegroundColor Yellow
 
 
 #-------------------------------------------------------------------------------------
