@@ -168,20 +168,28 @@ $agentFile = "C:\authnull-agent\app.env"
 
 # Write the text blob to the text file
 try {
-    $envContent | Out-File -FilePath $agentFile -Encoding utf8
-    Write-Host "Config saved successfully to: $agentFile" -ForegroundColor Green
+   # $envContent | Out-File -FilePath $agentFile -Encoding utf8
+    if (-not [string]::IsNullOrEmpty($envContent)) {
+        $envContent | Out-File -FilePath $agentFile -Encoding utf8
+        Write-Host "Config saved successfully to: $agentFile" -ForegroundColor Green
+    } else {
+        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+    }
 } catch {
     Write-Host "Failed to save Config: $_" -ForegroundColor Red
 }
-
 # Create or overwrite the environment file with the provided content
 try {
-    $envContent | Out-File -FilePath $envFilePath -Encoding utf8
-    Write-Host "Environment file saved successfully to: $envFilePath" -ForegroundColor Green
+   
+    if (-not [string]::IsNullOrEmpty($envContent)) {
+        $envContent | Out-File -FilePath $envFilePath -Encoding utf8
+        Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
+    } else {
+        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+    }
 } catch {
-    Write-Host "Failed to save environment file: $_" -ForegroundColor Red
+    Write-Host "Failed to save Config: $_" -ForegroundColor Red
 }
-
 # Log using high verbosity
 Write-Host "Agent env file saving completed." -ForegroundColor Cyan
 
@@ -384,22 +392,6 @@ $value = "0x000000e"
 Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value $value -Force -Verbose -Type DWORD 
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
 
-#Configuring PGina for LDAP
-#$regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
-try{
-
-# Check if the file exists
-if (Test-Path $regFilePath) {
-    # Import the .reg file using regedit.exe
-    Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
-    Write-Host "LDAP Registry file imported successfully." -ForegroundColor Green
-} else {
-    #Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
-}
-}
-catch{
-   # Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
-}
 
 #plugin order
 $multiLineContent = @"
@@ -452,22 +444,7 @@ Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDire
 Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value "0x000000e" -Force -Verbose -Type DWORD 
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value "0x0000000" -Force -Verbose -Type DWORD 
 
-#configuring LDAP
-$regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
-try{
 
-# Check if the file exists
-if (Test-Path $regFilePath) {
-    # Import the .reg file using regedit.exe
-    Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
-    Write-Host "LDAP Registry file imported successfully." -ForegroundColor Green
-} else {
-    Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
-}
-}
-catch{
-    Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
-}#>
 #plugin order
 $multiLineContent = "0f52390b-c781-43ae-bd62-553c77fa4cf7"
 
