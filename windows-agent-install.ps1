@@ -53,7 +53,7 @@ if (Test-Path $uninstallPath -PathType Leaf) {
     try{
     # Start the uninstaller process
     Write-Host "Uninstalling the already configured pGina" -ForegroundColor Yellow
-    Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -PassThru -Wait 
+    Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -Wait
     Write-Host "pGina uninstalled successfully." -ForegroundColor Green
 }
 catch {
@@ -133,36 +133,72 @@ else {
 
 #---------------------------------------------------------------------------------
 #Specify the file path where you want to save the content
-$file = $OutputPath + "\app.env"
-
+ 
 # Define the path where the environment file should be saved
-Write-Host "Just copy the app.env file content and press enter(Do not paste here..)" -ForegroundColor Green
 
-$choice = Read-Host
-if($choice -eq ''){
-try{
+if (-not (Test-Path -Path "C:\authnull-agent" -PathType Container)) {
+    try {
+        New-Item -Path "C:\authnull-agent" -ItemType Directory -Force | Out-Null
+        Write-Host "Created directory: C:\authnull-agent" -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to create directory: $_" -ForegroundColor Red
+        exit
+    }
+}
 
-# Get content from the clipboard
-$content = Get-Clipboard
-# Save the content to the file
-Set-Content -Path $file -Value $content
+$envFilePath = "C:\authnull-agent\app.env"
+$envCount=0
+$blank="_"
+Write-Host "Please enter the content for the text file. Press Enter on a blank line to finish. Ensure the first line is not blank."
+$envContent = ""
+do {
+    $line = Read-Host
+    if (-not [string]::IsNullOrEmpty($line)) {
+        $envContent += "$line`n" # Append the line to the text blob
+    } else {
+            $envCount=$envCount+1
+            if ($envCount -gt 1) { 
+                $blank=""
+            }
+    }
+} while (-not [string]::IsNullOrEmpty($blank))
+
+# Define the path for the text file
+$agentFile = "C:\authnull-agent\app.env"
+
+# Write the text blob to the text file
+try {
+   # $envContent | Out-File -FilePath $agentFile -Encoding utf8
+    if (-not [string]::IsNullOrEmpty($envContent)) {
+        $envContent | Out-File -FilePath $agentFile -Encoding utf8
+        Write-Host "Config saved successfully to: $agentFile" -ForegroundColor Green
+    } else {
+        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "Failed to save Config: $_" -ForegroundColor Red
+}
+# Create or overwrite the environment file with the provided content
+try {
+   
+    if (-not [string]::IsNullOrEmpty($envContent)) {
+        $envContent | Out-File -FilePath $envFilePath -Encoding utf8
+        Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
+    } else {
+        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "Failed to save Config: $_" -ForegroundColor Red
+}
+# Log using high verbosity
+Write-Host "Agent env file saving completed." -ForegroundColor Cyan
+
+
+
+ 
 
 # Check if the file exists and if it's empty
-if (Test-Path $file -PathType Leaf) {
-    $fileSize = (Get-Item $file).Length
-    if ($fileSize -eq 0) {
-        Write-Host "The $file is empty after pasting the content." -ForegroundColor Yellow
-    } else {
-        Write-Host "Content saved successfully to $file" -ForegroundColor Green
-    }
-} else {
-    Write-Host "File does not exist." -ForegroundColor Red
-}
-}
-catch{
-    Write-Host "Failed to save content: $_" -ForegroundColor Red
-}
-}
+ 
 #---------------------------------------------------------------------------
 Write-Host "Extracting agent"
 
@@ -182,21 +218,22 @@ if (Test-Path $AgentPath) {
     }
 
 #reusing agent path
-$AgentPath = $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build\windows-agent-amd64.exe"
+$AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build\windows-agent-amd64.exe"
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
-$WindowsAgent = $OutputPath + "\windows-agent-amd64.exe" 
+
 
 try {
-    New-Service -Name "AuthNull1" -BinaryPathName $WindowsAgent
-
-    Start-Service "AuthNull1" -WarningAction SilentlyContinue
+    New-Service -Name "AuthNullAgent6" -BinaryPathName $OutputPath"\windows-agent-amd64.exe" 
+    Write-Host "The path of the agent is " $OutputPath "\windows-agent-amd64.exe" 
+    Start-Service AuthNullAgent6 -WarningAction SilentlyContinue
 } catch {
     Write-Host "Registering AuthNull Agent failed!" -ForegroundColor Red
 }
 finally {
     # Do this after the try block regardless of whether an exception occurred or not
 }
-Get-Service "AuthNull1"
+
+
 #-------------------------------------------------------------------------------------
 
 #Installing pGina
@@ -355,38 +392,7 @@ $value = "0x000000e"
 Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value $value -Force -Verbose -Type DWORD 
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
 
-<#configure LDAP
-$keyPath = "HKLM:\Software\Pgina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
 
-$dnPattern = "CN=%u,CN=Users,DC=authnull2,DC=com"
-$groupdnPattern = "cn=Users,cn=Authnull2,cn=com,CN=%u,CN=Users,DC=authnull2,DC=com"
-$ldapHost = "10.0.0.4"
-$ldapPort = "185"
-$searchDN = "CN=%u,CN=Users,DC=authnull2,DC=com"
-
-Set-ItemProperty -Path $keyPath -Name "DnPattern" -Value $dnPattern -Force -Verbose -Type string
-Set-ItemProperty -Path $keyPath -Name "GroupDnPattern" -Value $groupdnPattern -Force -Verbose -Type string
-Set-ItemProperty -Path $keyPath -Name "LdapHost" -Value  $ldapHost -Force -Verbose -Type MultiString 
-Set-ItemProperty -Path $keyPath -Name "LdapPort" -Value  $ldapPort  -Force -Verbose -Type DWORD 
-Set-ItemProperty -Path $keyPath -Name "SearchDN" -Value  $searchDN -Force -Verbose -Type string 
-
-<#Configuring PGina for LDAP
-$regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
-try{
-
-# Check if the file exists
-if (Test-Path $regFilePath) {
-    # Import the .reg file using regedit.exe
-    Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
-    Write-Host "LDAP Registry file imported successfully." -ForegroundColor Green
-} else {
-    Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
-}
-}
-catch{
-    Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
-}
-#>
 #plugin order
 $multiLineContent = @"
 12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
@@ -438,38 +444,6 @@ Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDire
 Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value "0x000000e" -Force -Verbose -Type DWORD 
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value "0x0000000" -Force -Verbose -Type DWORD 
 
-<#configuring LDAP
-$keyPath = "HKLM:\Software\Pgina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
-$dnPattern = "CN=%u,CN=Users,DC=authnull2,DC=com"
-$groupdnPattern = "cn=Users,cn=Authnull2,cn=com,CN=%u,CN=Users,DC=authnull2,DC=com"
-$ldapHost = "10.0.0.4"
-$ldapPort = "185"
-$searchDN = "CN=%u,CN=Users,DC=authnull2,DC=com"
-
-Set-ItemProperty -Path $registryKeyPath -Name "DnPattern" -Value $dnPattern -Force -Verbose -Type string
-Set-ItemProperty -Path $registryKeyPath -Name "GroupDnPattern" -Value $groupdnPattern -Force -Verbose -Type string
-Set-ItemProperty -Path $registryKeyPath -Name "LdapHost" -Value  $ldapHost -Force -Verbose -Type MultiString 
-Set-ItemProperty -Path $registryKeyPath -Name "LdapPort" -Value  $ldapPort  -Force -Verbose -Type DWORD 
-Set-ItemProperty -Path $registryKeyPath -Name "SearchDN" -Value  $searchDN -Force-Verbose -Type string 
-
-
-<#configuring LDAP
-$regFilePath  = $OutputPath+"\windows-endpoint-windows-agent\gpo\ldap.reg"
-try{
-
-# Check if the file exists
-if (Test-Path $regFilePath) {
-    # Import the .reg file using regedit.exe
-    Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
-    Write-Host "LDAP Registry file imported successfully." -ForegroundColor Green
-} else {
-    Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
-}
-}
-catch{
-    Write-Host "Failed to configure LDAP Registry values: $_"  -ForegroundColor Red
-}#>
-
 
 #plugin order
 $multiLineContent = "0f52390b-c781-43ae-bd62-553c77fa4cf7"
@@ -520,16 +494,17 @@ else{
 #updating group policy to update seucrity settings
 Write-Host "Do you want to enable local policy configuration for LDAP users to login locally(Optional)? Press Y/N" -ForegroundColor Green
 $securityLocalPolicy = Read-Host 
-$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
-$backupFolder = $OutputPath + "\windows-endpoint-windows-agent\gpo\securitySettings.inf"
+$lgpoPath =$OutputPath + "\windows-endpoint-windows-agent\gpo\LGPO.exe"
+$infFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\securitySettings.inf"
     if($securityLocalPolicy -eq 'Y'){
         try{
-        Start-Process -FilePath $lgpoPath -ArgumentList "/s $backupFolder" -Wait
-        gpupdate /force -ForegroundColor Green
+        Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
+        #gpupdate /force -ForegroundColor Green
+
         Write-Host "Security settings installed successfully." -ForegroundColor Green
         } 
         catch{
-            Write-Host "Security Setting installation failed : $_" -ForegroundColor Red
+            Write-Host "Security setting installation failed : $_" -ForegroundColor Red
         }
 }
 #--------------------------------------------------------------------------------------------------
