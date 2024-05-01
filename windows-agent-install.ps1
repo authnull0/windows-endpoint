@@ -50,10 +50,15 @@ $uninstallPath = "C:\Program Files\pGina\unins000.exe"
 
 # Check if the uninstaller executable exists
 if (Test-Path $uninstallPath -PathType Leaf) {
+    try{
     # Start the uninstaller process
     Write-Host "Uninstalling the already configured pGina" -ForegroundColor Yellow
     Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -Wait
     Write-Host "pGina uninstalled successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "Uninstalling Pgina Failed: $_" -ForegroundColor Red
+}
 } else {
     Write-Host "Uninstaller not found at $uninstallPath." -ForegroundColor Red
 }
@@ -75,15 +80,26 @@ $keyPath = "HKLM:\Software\pGina3"
 
 # Check if the registry key exists
 if (Test-Path -Path $keyPath) {
-    # Get all values under the registry key
-    $values = Get-ItemProperty -Path $keyPath | ForEach-Object { $_.PSObject.Properties.Name }
+$RegistryKeyPath = "HKLM:\SOFTWARE\pGina3"
+# Check if the registry key exists
+if (Test-Path -Path $RegistryKeyPath) {
+    try{
+    # Remove the registry key and all its subkeys and values
+    Remove-Item -Path $RegistryKeyPath -Recurse -Force
+    Write-Host "Registry key and all subkeys and values deleted successfully." -ForegroundColor Green
+    }
 
-    # Delete each value under the registry key
-    foreach ($valueName in $values) {
-        Remove-ItemProperty -Path $keyPath -Name $valueName -ErrorAction Silentlycontinue
-          }
-    Write-Host "All values under pGina3 registry key '$keyPath' deleted successfully.." -ForegroundColor Green
-} else {
+    catch{
+        Write-Host "Failed to delete pgina registry keys and values: $_" -ForegroundColor Red
+    }
+
+} 
+else {
+    Write-Host "Registry key does not exist." -ForegroundColor Yellow
+}
+
+    } 
+else {
     Write-Host "Registry key '$keyPath' not found." -ForegroundColor Yellow
 }
 #-------------------------------------------------------------------------------------
@@ -116,25 +132,55 @@ else {
 }
 
 #---------------------------------------------------------------------------------
+#Specify the file path where you want to save the content
+ 
 # Define the path where the environment file should be saved
-$envFilePath = $OutputPath+ "\app.env"
 
-# Ask for the content of the environment file
-$envContent = Read-Host "Enter the content of the environment file (press Enter twice to finish):"
+if (-not (Test-Path -Path "C:\authnull-agent" -PathType Container)) {
+    try {
+        New-Item -Path "C:\authnull-agent" -ItemType Directory -Force | Out-Null
+        Write-Host "Created directory: C:\authnull-agent" -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to create directory: $_" -ForegroundColor Red
+        exit
+    }
+}
 
-
-# Prompt the user for input
+$envFilePath = "C:\authnull-agent\app.env"
+$envCount=0
+$blank="_"
+Write-Host "Please enter the content for the text file. Press Enter on a blank line to finish. Ensure the first line is not blank."
 $envContent = ""
 do {
     $line = Read-Host
     if (-not [string]::IsNullOrEmpty($line)) {
         $envContent += "$line`n" # Append the line to the text blob
+    } else {
+            $envCount=$envCount+1
+            if ($envCount -gt 1) { 
+                $blank=""
+            }
     }
-} while (-not [string]::IsNullOrEmpty($line))
+} while (-not [string]::IsNullOrEmpty($blank))
+
+# Define the path for the text file
+$agentFile = "C:\authnull-agent\app.env"
 
 # Write the text blob to the text file
 try {
    # $envContent | Out-File -FilePath $agentFile -Encoding utf8
+    if (-not [string]::IsNullOrEmpty($envContent)) {
+        $envContent | Out-File -FilePath $agentFile -Encoding utf8
+        Write-Host "Config saved successfully to: $agentFile" -ForegroundColor Green
+    } else {
+        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "Failed to save Config: $_" -ForegroundColor Red
+}
+# Create or overwrite the environment file with the provided content
+try {
+   
     if (-not [string]::IsNullOrEmpty($envContent)) {
         $envContent | Out-File -FilePath $envFilePath -Encoding utf8
         Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
@@ -144,12 +190,19 @@ try {
 } catch {
     Write-Host "Failed to save Config: $_" -ForegroundColor Red
 }
-#----------------------------------------------------------------------
+# Log using high verbosity
+Write-Host "Agent env file saving completed." -ForegroundColor Cyan
+
+
+
+ 
+
+# Check if the file exists and if it's empty
+ 
+#---------------------------------------------------------------------------
 Write-Host "Extracting agent"
 
 $AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build.zip"
-
-
 
 if (Test-Path $AgentPath) {
     # Extract the file
@@ -168,10 +221,11 @@ if (Test-Path $AgentPath) {
 $AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build\windows-agent-amd64.exe"
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
 
-try {
-    New-Service -Name "AuthNullAgent" -BinaryPathName $OutputPath+"\windows-agent-amd64.exe" 
 
-    Start-Service AuthNullAgent -WarningAction SilentlyContinue
+try {
+    New-Service -Name "AuthNullAgent6" -BinaryPathName $OutputPath"\windows-agent-amd64.exe" 
+    Write-Host "The path of the agent is " $OutputPath "\windows-agent-amd64.exe" 
+    Start-Service AuthNullAgent6 -WarningAction SilentlyContinue
 } catch {
     Write-Host "Registering AuthNull Agent failed!" -ForegroundColor Red
 }
@@ -180,20 +234,25 @@ finally {
 }
 
 
-#-----------------------------------------------------------------------
+#-------------------------------------------------------------------------------------
+
 #Installing pGina
 $InstallerPath= $OutputPath + "\windows-endpoint-windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 
-
- 
 if (-not $InstallerPath) {
     Write-Host "Installation path does not exist" -ForegroundColor Yellow
     exit
 } 
- 
-
-
-# Check if the installer executable exists
+ # Check if the installer executable exists
+if (Test-Path $InstallerPath) {
+#Installing pGina
+$InstallerPath= $OutputPath + "\windows-endpoint-windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+Write-Host "After installation completed please CLOSE the pGina" -ForegroundColor Yellow
+if (-not $InstallerPath) {
+    Write-Host "Installation path does not exist" -ForegroundColor Yellow
+    exit
+} 
+ # Check if the installer executable exists
 if (Test-Path $InstallerPath) {
     try {
         # Start the installation process
@@ -214,18 +273,11 @@ else {
     Write-Host "Installer not found at: $InstallerPath" -ForegroundColor Red
 }
 
-# Get the process associated with pGina
-$pginaProcess = Get-Process -Name "pGina.Configuration"
 
-# Check if the pGina process exists
-if ($pginaProcess) {
-    # Terminate the pGina process
-    $pginaProcess | Stop-Process -Force
-    Write-Host "pGina application closed successfully." -ForegroundColor Green
-} else {
-    Write-Host "pGina application is not running." -ForegroundColor Yellow
+} 
+else {
+    Write-Host "Installer not found at: $InstallerPath" -ForegroundColor Red
 }
-
 #-------------------------------------------------------------------------------------
 
 #modify machine config
@@ -281,7 +333,7 @@ else {
 $sourceDirectory = $OutputPath + "\windows-endpoint-windows-agent\credential-provider\plugins" 
 
 # Define the destination directory path
-Write-Host "Copying plugins... please wait" -ForegroundColor Red
+Write-Host "Copying plugins... please wait" -ForegroundColor Yellow
 $destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
 
 # Check if the directory exists; if not, create it
@@ -294,88 +346,183 @@ if (-not (Test-Path -Path  $destinationDirectory -PathType Container)) {
         exit
     }
 }
-#--------------------------------------------------------------------
+
 # Copy files from source directory to destination directory
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
-Write-Host "Copied files successfully to the plugin folder. Open Pgina and configure plugins.." -ForegroundColor Green
+Write-Host "Copied files successfully to the plugin folder." -ForegroundColor Green
 
 
+#-------------------------------------------------------------------------------------
 #copy depedency dlls
 Write-Host "Copying dependencies .." -ForegroundColor Green
 $sourceDirectory = $OutputPath + "\windows-endpoint-windows-agent\credential-provider\dll-dependencies" 
 $destinationDirectory = "C:\program files\system32" 
 
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
-Write-Host "Copied dependencies successfully" -ForegroundColor Green
+Write-Host "Copied dependencies successfully." -ForegroundColor Green
 
-#---------------------------------------------------------------------
+#--------------------------------------------------------------------------
 #updating group policy to enable and disable respective credential providers
-# Define paths
+
 $lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
 $backupFolder = $OutputPath+"\windows-endpoint-windows-agent\gpo\registry.pol"
-
-# Step 1: Create a backup of current group policy settings
-Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
-gpupdate /force -ForegroundColor Green
-#--------------------------------------------------------------------------------
-Write-Host "Configuring pGina for LDAP.." -ForegroundColor Yellow 
-#Configuring PGina for Local Users and LDAP
-$regFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\pginaRegistryLDAP.reg"
-
-# Check if the file exists
-if (Test-Path $regFilePath) {
-    # Import the .reg file using regedit.exe
-    Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
-    Write-Host "LDAP Registry file imported successfully." -ForegroundColor Green
-} else {
-    Write-Host "LDAP Registry file not found at $regFilePath." -ForegroundColor Red
+try{
+    Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
+    Write-Host "Group policy updated sucessfully." -ForegroundColor Green
 }
-#----------------------------------------------------------------------------
-
-Write-Host "Enter Y to configure for local users or enter N..." -ForegroundColor Green
-$options = Read-Host 
-if ($options -eq 'Y')
-{
-Write-Host "Configuring PGina for Local Users and LDAP" -ForegroundColor Yellow
-$regFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\pginaRegistryLocalUser.reg"
-
-if (Test-Path $regFilePath) {
-    # Import the .reg file using regedit.exe
-    Start-Process "regedit.exe" -ArgumentList "/s $regFilePath" -Wait
-    Write-Host "Local User Registry file imported successfully." -ForegroundColor Green
-} else {
-    Write-Host "Local User Registry file not found at $regFilePath." -ForegroundColor Red
+catch{
+    Write-Host "Group policy updation failed: $_" -ForegroundColor Red
 }
 
-}
-else {
-Write-Host "Configuring LDAP only..." -ForegroundColor Green
 
+
+#---------------------------------------------------------------------
+#Configuring pGina
+Write-Host "Do you want to configure Authnull to manage local users? Press Y/N" -ForegroundColor Green
+$choice = Read-Host 
+if($choice -eq 'Y'){
+$registryKeyPath =  "HKLM:\Software\Pgina3"
+
+# Define the name of the multi-string value
+$valueName = "PluginDirectories"
+$destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
+Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDirectory -Force -Verbose -Type MultiString 
+    
+$value = "0x000000e"
+Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value $value -Force -Verbose -Type DWORD 
+Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
+
+
+#plugin order
+$multiLineContent = @"
+12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
+0f52390b-c781-43ae-bd62-553c77fa4cf7
+"@
+
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+
+<#disabling the credential provider
+# Define an array of key-value pairs
+$keyValuePairs = @"
+{1b283861-754f-4022-ad47-a5eaaa618894}	3
+{1ee7337f-85ac-45e2-a23c-37c753209769}	3
+{2135f72a-90b5-4ed3-a7f1-8bb705ac276a}	3
+{25cbb996-92ed-457e-b28c-4774084bd562}	3
+{27fbdb57-b613-4af2-9d7e-4fa7a66c21ad}	3
+{3dd6bec0-8193-4ffe-ae25-e08e39ea4063}	3
+{48b4e58d-2791-456c-9091-d524c6c706f2}	3
+{600e7adb-da3e-41a4-9225-3c0399e88c0c}	3
+{60b78e88-ead8-445c-9cfd-0b87f74ea6cd}	3
+{8fd7e19c-3bf7-489b-a72c-846ab3678c96}	3
+{94596c7e-3744-41ce-893e-bbf09122f76a}	3
+{bec09223-b018-416d-a0ac-523971b639f5}	3
+{c5d7540a-cd51-453b-b22b-05305ba03f07}	3
+{cb82ea12-9f71-446d-89e1-8d0924e1256e}	3
+{d6886603-9d2f-4eb2-b667-1971041fa96b}	3
+{e74e57b0-6c6d-44d5-9cda-fb2df5ed7435}	3
+{f64945df-4fa9-4068-a2fb-61af319edd33}	3
+{f8a0b131-5f68-486c-8040-7e8fc3c85bb6}	3
+{f8a1793b-7873-4046-b2a7-1f318747f427}	3
+
+"@
+Write-Host "Registry values have been set successfully."
+#>
+}
+elseif($choice -eq 'N'){
+
+$registryKeyPath =  "HKLM:\Software\Pgina3"
+
+# Define the name of the multi-string value
+$valueName = "PluginDirectories"
+$destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
+Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDirectory -Force -Verbose -Type MultiString 
+    
+#$value = "0x000000e"
+Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value "0x000000e" -Force -Verbose -Type DWORD 
+Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value "0x0000000" -Force -Verbose -Type DWORD 
+
+
+#plugin order
+$multiLineContent = "0f52390b-c781-43ae-bd62-553c77fa4cf7"
+
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
+
+
+
+
+<#disabling the credential provider
+# Define an array of key-value pairs
+
+$keyValuePairs = @"
+{1b283861-754f-4022-ad47-a5eaaa618894}	3
+{1ee7337f-85ac-45e2-a23c-37c753209769}	3
+{2135f72a-90b5-4ed3-a7f1-8bb705ac276a}	3
+{25cbb996-92ed-457e-b28c-4774084bd562}	3
+{27fbdb57-b613-4af2-9d7e-4fa7a66c21ad}	3
+{3dd6bec0-8193-4ffe-ae25-e08e39ea4063}	3
+{48b4e58d-2791-456c-9091-d524c6c706f2}	3
+{600e7adb-da3e-41a4-9225-3c0399e88c0c}	3
+{60b78e88-ead8-445c-9cfd-0b87f74ea6cd}	3
+{8fd7e19c-3bf7-489b-a72c-846ab3678c96}	3
+{94596c7e-3744-41ce-893e-bbf09122f76a}	3
+{bec09223-b018-416d-a0ac-523971b639f5}	3
+{c5d7540a-cd51-453b-b22b-05305ba03f07}	3
+{cb82ea12-9f71-446d-89e1-8d0924e1256e}	3
+{d6886603-9d2f-4eb2-b667-1971041fa96b}	3
+{e74e57b0-6c6d-44d5-9cda-fb2df5ed7435}	3
+{f64945df-4fa9-4068-a2fb-61af319edd33}	3
+{f8a0b131-5f68-486c-8040-7e8fc3c85bb6}	3
+{f8a1793b-7873-4046-b2a7-1f318747f427}	3
+
+"@
+
+Set-ItemProperty -Path $registryKeyPath -Name "CredentialProviderFilters" -Value $keyValuePairs -Force -Verbose -Type MultiString 
+#>
+Write-Host "Registry values have been set successfully."
+
+}
+else{
+    Write-Host "Please provide the right choice" -ForegroundColor Red
 }
 #---------------------------------------------------------------------------------------------
+#updating group policy to update seucrity settings
 Write-Host "Do you want to enable local policy configuration for LDAP users to login locally(Optional)? Press Y/N" -ForegroundColor Green
 $securityLocalPolicy = Read-Host 
-$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
-$backupFolder = $OutputPath + "\windows-endpoint-windows-agent\gpo\securitySettings.inf"
+$lgpoPath =$OutputPath + "\windows-endpoint-windows-agent\gpo\LGPO.exe"
+$infFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\security.inf"
     if($securityLocalPolicy -eq 'Y'){
         try{
-        Start-Process -FilePath $lgpoPath -ArgumentList "/s $backupFolder" -Wait
-        gpupdate /force -ForegroundColor Green
+        Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
+        #gpupdate /force -ForegroundColor Green
+
         Write-Host "Security settings installed successfully." -ForegroundColor Green
         } 
         catch{
-            Write-Host "Security Setting installation failed : $_" -ForegroundColor Red
-        
+            Write-Host "Security setting installation failed : $_" -ForegroundColor Red
         }
 }
-
-
 #--------------------------------------------------------------------------------------------------
 # Start the process again
+try{
 Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
 Write-Host "Restarting pGina" -ForegroundColor Green
 
+}
+catch{
+    Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
+}
 #------------------------------------------------------------------------------------------------------------------------------------
-#Restart Computer
-
-#Restart-Computer -Force
+<#Restart Computer
+try{
+    Restart-Computer -Force
+}
+catch{
+    Write-Host "Restarting computer failed: $_" -ForegroundColor Red
+}
+#>
