@@ -483,6 +483,11 @@ Write-Host "Registry values have been set successfully."
 else{
     Write-Host "Please provide the right choice" -ForegroundColor Red
 }
+
+
+#Setting LocalAdminFallback Registry 
+
+ set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
 #---------------------------------------------------------------------------------------------
 #updating group policy to update seucrity settings
 Write-Host "Do you want to enable local policy configuration for LDAP users to login locally(Optional)? Press Y/N" -ForegroundColor Green
