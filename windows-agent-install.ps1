@@ -323,7 +323,7 @@ else {
 #copy plugins 
 
 # Define the source directory path
-$sourceDirectory = $OutputPath + "\windows-endpoint-windows-agent\credential-provider\plugins" 
+$sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\plugins" 
 
 # Define the destination directory path
 Write-Host "Copying plugins... please wait" -ForegroundColor Yellow
@@ -348,7 +348,7 @@ Write-Host "Copied files successfully to the plugin folder." -ForegroundColor Gr
 #-------------------------------------------------------------------------------------
 #copy depedency dlls
 Write-Host "Copying dependencies .." -ForegroundColor Green
-$sourceDirectory = $OutputPath + "\windows-endpoint-windows-agent\credential-provider\dll-dependencies" 
+$sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\dll-dependencies" 
 $destinationDirectory = "C:\program files\system32" 
 
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
@@ -357,8 +357,8 @@ Write-Host "Copied dependencies successfully." -ForegroundColor Green
 #--------------------------------------------------------------------------
 #updating group policy to enable and disable respective credential providers
 
-$lgpoPath = $OutputPath+"\windows-endpoint-windows-agent\gpo\LGPO.exe"
-$backupFolder = $OutputPath+"\windows-endpoint-windows-agent\gpo\registry.pol"
+$lgpoPath = $OutputPath+"\windows-endpoint-main\gpo\LGPO.exe"
+$backupFolder = $OutputPath+"\windows-endpoint-main\gpo\registry.pol"
 try{
     Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
     Write-Host "Group policy updated sucessfully." -ForegroundColor Green
@@ -492,8 +492,8 @@ else{
 #updating group policy to update seucrity settings
 Write-Host "Do you want to enable local policy configuration for LDAP users to login locally(Optional)? Press Y/N" -ForegroundColor Green
 $securityLocalPolicy = Read-Host 
-$lgpoPath =$OutputPath + "\windows-endpoint-windows-agent\gpo\LGPO.exe"
-$infFilePath = $OutputPath + "\windows-endpoint-windows-agent\gpo\securitySettings.inf"
+$lgpoPath =$OutputPath + "\windows-endpoint-main\gpo\LGPO.exe"
+$infFilePath = $OutputPath + "\windows-endpoint-main\gpo\securitySettings.inf"
     if($securityLocalPolicy -eq 'Y'){
         try{
         Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
