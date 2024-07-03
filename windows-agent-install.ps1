@@ -194,7 +194,7 @@ try {
 #---------------------------------------------------------------------------
 Write-Host "Extracting agent"
 
-$AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build.zip"
+$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build.zip"
 
 if (Test-Path $AgentPath) {
     # Extract the file
@@ -210,7 +210,7 @@ if (Test-Path $AgentPath) {
     }
 
 #reusing agent path
-$AgentPath= $OutputPath + "\windows-endpoint-windows-agent\agent\windows-build\windows-agent-amd64.exe"
+$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build\windows-agent-amd64.exe"
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
 
 
@@ -230,7 +230,7 @@ Write-Host "The path of the agent is " $OutputPath"\windows-agent-amd64.exe" -Fo
 #-------------------------------------------------------------------------------------
 
 #Installing pGina
-$InstallerPath= $OutputPath + "\windows-endpoint-windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+$InstallerPath= $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 
 if (-not $InstallerPath) {
     Write-Host "Installation path does not exist" -ForegroundColor Yellow
@@ -239,7 +239,7 @@ if (-not $InstallerPath) {
  # Check if the installer executable exists
 if (Test-Path $InstallerPath) {
 #Installing pGina
-$InstallerPath= $OutputPath + "\windows-endpoint-windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+$InstallerPath= $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 Write-Host "After installation completed please CLOSE the pGina" -ForegroundColor Yellow
 if (-not $InstallerPath) {
     Write-Host "Installation path does not exist" -ForegroundColor Yellow
