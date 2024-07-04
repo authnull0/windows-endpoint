@@ -357,7 +357,7 @@ Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse
 Write-Host "Copied dependencies successfully." -ForegroundColor Green
 
 #--------------------------------------------------------------------------
-#updating group policy to enable and disable respective credential providers
+<#updating group policy to enable and disable respective credential providers
 
 $lgpoPath = $OutputPath+"\windows-endpoint-main\gpo\LGPO.exe"
 $backupFolder = $OutputPath+"\windows-endpoint-main\gpo\registry.pol"
@@ -399,7 +399,7 @@ Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Orde
 Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 
-<#disabling the credential provider
+disabling the credential provider
 # Define an array of key-value pairs
 $keyValuePairs = @"
 {1b283861-754f-4022-ad47-a5eaaa618894}	3
@@ -424,7 +424,7 @@ $keyValuePairs = @"
 
 "@
 Write-Host "Registry values have been set successfully."
-#>
+
 }
 elseif($choice -eq 'N'){
 
@@ -451,7 +451,7 @@ Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $mul
 
 
 
-<#disabling the credential provider
+disabling the credential provider
 # Define an array of key-value pairs
 
 $keyValuePairs = @"
@@ -478,7 +478,7 @@ $keyValuePairs = @"
 "@
 
 Set-ItemProperty -Path $registryKeyPath -Name "CredentialProviderFilters" -Value $keyValuePairs -Force -Verbose -Type MultiString 
-#>
+
 Write-Host "Registry values have been set successfully."
 
 }
@@ -518,7 +518,7 @@ catch{
     Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
 }
 #------------------------------------------------------------------------------------------------------------------------------------
-<#Restart Computer
+Restart Computer
 try{
     Restart-Computer -Force
 }
