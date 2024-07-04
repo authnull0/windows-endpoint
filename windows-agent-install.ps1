@@ -75,6 +75,8 @@ if(Test-Path $pginaPath)
         Write-Host "Pgina folder cannot be deleted: $_" -ForegroundColor Red 
     }
 }
+
+
 #Deleting the pGina3 registry key values
 $keyPath = "HKLM:\Software\pGina3"
 
@@ -349,7 +351,7 @@ Write-Host "Copied files successfully to the plugin folder." -ForegroundColor Gr
 #copy depedency dlls
 Write-Host "Copying dependencies .." -ForegroundColor Green
 $sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\dll-dependencies" 
-$destinationDirectory = "C:\program files\system32" 
+$destinationDirectory = "C:\Windows\System32" 
 
 Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
 Write-Host "Copied dependencies successfully." -ForegroundColor Green
