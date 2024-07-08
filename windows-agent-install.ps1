@@ -381,7 +381,7 @@ catch{
 
 
 
-#---------------------------------------------------------------------
+<#---------------------------------------------------------------------
 #Configuring pGina
 Write-Host "Do you want to configure Authnull to manage local users? Press Y/N" -ForegroundColor Green
 $choice = Read-Host 
@@ -530,7 +530,7 @@ Write-Host "Restarting pGina" -ForegroundColor Green
 catch{
     Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
 }
-<#------------------------------------------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------------------------------------------
 Restart Computer
 try{
     Restart-Computer -Force
