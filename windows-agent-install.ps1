@@ -409,7 +409,7 @@ Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Orde
 Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 
-<#disabling the credential provider
+disabling the credential provider
 # Define an array of key-value pairs
 $keyValuePairs = @"
 {1b283861-754f-4022-ad47-a5eaaa618894}	3
@@ -435,7 +435,7 @@ $keyValuePairs = @"
 "@
 Set-ItemProperty -Path $registryKeyPath -Name "CredentialProviderFilters" -Value $keyValuePairs -Force -Verbose -Type MultiString 
 
-#>
+
 Write-Host "Registry values have been set successfully." -ForegroundColor Green
 
 }
@@ -464,7 +464,7 @@ Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $mul
 
 
 
-<#disabling the credential provider
+disabling the credential provider
 # Define an array of key-value pairs
 
 $keyValuePairs = @"
@@ -491,7 +491,7 @@ $keyValuePairs = @"
 "@
 
 Set-ItemProperty -Path $registryKeyPath -Name "CredentialProviderFilters" -Value $keyValuePairs -Force -Verbose -Type MultiString 
-#>
+
 Write-Host "Registry values have been set successfully." -ForegroundColor Green
 
 }
