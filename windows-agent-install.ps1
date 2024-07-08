@@ -77,15 +77,21 @@ if(Test-Path $pginaPath)
 }
 
 #Deleting dlls
-try{
-Remove-Item -Path "C:\Windows\System32\golib.dll" -Force
-Remove-Item -Path "C:\Windows\System32\pGinaGINA .dll" -Force
-Remove-Item -Path "C:\Windows\System32\pGinaCredentialProvider .dll" -Force
+$files = @("C:\Windows\System32\golib.dll", "C:\Windows\System32\pGinaGINA.dll", "C:\Windows\System32\pGinaCredentialProvider.dll")
 
-Write-Host "Pgina Dlls deleted successfully.." -ForegroundColor Green
-}catch{
-    Write-Host "Failed to delete pgina Dlls" -ForegroundColor Red
+foreach ($file in $files) {
+    if (Test-Path -Path $file) {
+        try {
+            Remove-Item -Path $file -Force
+            Write-Host "Deleted $file successfully.." -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to delete $file" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "$file does not exist" -ForegroundColor Yellow
+    }
 }
+
 
 #Deleting the pGina3 registry key values
 $keyPath = "HKLM:\Software\pGina3"
