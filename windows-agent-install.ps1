@@ -76,6 +76,16 @@ if(Test-Path $pginaPath)
     }
 }
 
+#Deleting dlls
+try{
+Remove-Item -Path "C:\Windows\System32\golib.dll" -Force
+Remove-Item -Path "C:\Windows\System32\pGinaGINA .dll" -Force
+Remove-Item -Path "C:\Windows\System32\pGinaCredentialProvider .dll" -Force
+
+Write-Host "Pgina Dlls deleted successfully.." -ForegroundColor Green
+}catch{
+    Write-Host "Failed to delete pgina Dlls" -ForegroundColor Red
+}
 
 #Deleting the pGina3 registry key values
 $keyPath = "HKLM:\Software\pGina3"
@@ -357,7 +367,7 @@ Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse
 Write-Host "Copied dependencies successfully." -ForegroundColor Green
 
 #--------------------------------------------------------------------------
-<#updating group policy to enable and disable respective credential providers
+#updating group policy to enable and disable respective credential providers
 
 $lgpoPath = $OutputPath+"\windows-endpoint-main\gpo\LGPO.exe"
 $backupFolder = $OutputPath+"\windows-endpoint-main\gpo\registry.pol"
@@ -384,14 +394,12 @@ $destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
 Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDirectory -Force -Verbose -Type MultiString 
     
 $value = "0x000000e"
-Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value $value -Force -Verbose -Type DWORD 
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
 
 
 #plugin order
 $multiLineContent = @"
 12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
-0f52390b-c781-43ae-bd62-553c77fa4cf7
 "@
 
 Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
@@ -399,7 +407,7 @@ Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Orde
 Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 
-disabling the credential provider
+<#disabling the credential provider
 # Define an array of key-value pairs
 $keyValuePairs = @"
 {1b283861-754f-4022-ad47-a5eaaa618894}	3
@@ -423,70 +431,12 @@ $keyValuePairs = @"
 {f8a1793b-7873-4046-b2a7-1f318747f427}	3
 
 "@
-Write-Host "Registry values have been set successfully."
-
-}
-elseif($choice -eq 'N'){
-
-$registryKeyPath =  "HKLM:\Software\Pgina3"
-
-# Define the name of the multi-string value
-$valueName = "PluginDirectories"
-$destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
-Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDirectory -Force -Verbose -Type MultiString 
-    
-#$value = "0x000000e"
-Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value "0x000000e" -Force -Verbose -Type DWORD 
-Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value "0x0000000" -Force -Verbose -Type DWORD 
-
-
-#plugin order
-$multiLineContent = "0f52390b-c781-43ae-bd62-553c77fa4cf7"
-
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-
-
-
-
-disabling the credential provider
-# Define an array of key-value pairs
-
-$keyValuePairs = @"
-{1b283861-754f-4022-ad47-a5eaaa618894}	3
-{1ee7337f-85ac-45e2-a23c-37c753209769}	3
-{2135f72a-90b5-4ed3-a7f1-8bb705ac276a}	3
-{25cbb996-92ed-457e-b28c-4774084bd562}	3
-{27fbdb57-b613-4af2-9d7e-4fa7a66c21ad}	3
-{3dd6bec0-8193-4ffe-ae25-e08e39ea4063}	3
-{48b4e58d-2791-456c-9091-d524c6c706f2}	3
-{600e7adb-da3e-41a4-9225-3c0399e88c0c}	3
-{60b78e88-ead8-445c-9cfd-0b87f74ea6cd}	3
-{8fd7e19c-3bf7-489b-a72c-846ab3678c96}	3
-{94596c7e-3744-41ce-893e-bbf09122f76a}	3
-{bec09223-b018-416d-a0ac-523971b639f5}	3
-{c5d7540a-cd51-453b-b22b-05305ba03f07}	3
-{cb82ea12-9f71-446d-89e1-8d0924e1256e}	3
-{d6886603-9d2f-4eb2-b667-1971041fa96b}	3
-{e74e57b0-6c6d-44d5-9cda-fb2df5ed7435}	3
-{f64945df-4fa9-4068-a2fb-61af319edd33}	3
-{f8a0b131-5f68-486c-8040-7e8fc3c85bb6}	3
-{f8a1793b-7873-4046-b2a7-1f318747f427}	3
-
-"@
-
 Set-ItemProperty -Path $registryKeyPath -Name "CredentialProviderFilters" -Value $keyValuePairs -Force -Verbose -Type MultiString 
 
-Write-Host "Registry values have been set successfully."
 
+Write-Host "Registry values have been set successfully." -ForegroundColor Green
+#>
 }
-else{
-    Write-Host "Please provide the right choice" -ForegroundColor Red
-}
-
-
 #Setting LocalAdminFallback Registry 
 
  set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
@@ -517,7 +467,7 @@ Write-Host "Restarting pGina" -ForegroundColor Green
 catch{
     Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
 }
-#------------------------------------------------------------------------------------------------------------------------------------
+<#------------------------------------------------------------------------------------------------------------------------------------
 Restart Computer
 try{
     Restart-Computer -Force
