@@ -3,7 +3,7 @@
 # Download Files
 sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/pam_google_authenticator.so
 sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/did.sh
-sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/log_pam_rhost.sh
+sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/log.sh
 
 # Log the download status
 echo "Files downloaded. Check the logs with: tail -f /var/log/auth.log (Ubuntu) or tail -f /var/log/secure (CentOS)"
