@@ -423,20 +423,20 @@ $infFilePath = $OutputPath + "\windows-endpoint-main\gpo\securitySettings.inf"
 # Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 
 # # Step 3: Verify LDAP authentication configuration
-# $ldapRegistryPath = "HKLM:\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
+# # $ldapRegistryPath = "HKLM:\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
 
-# # Ensure the registry key path exists
-# if (-not (Test-Path $ldapRegistryPath)) {
-#     New-Item -Path $ldapRegistryPath -Force | Out-Null
-# }
-# try{
-# Set-ItemProperty -Path $ldapRegistryPath -Name "LdapHost" -Value "10.0.0.30" -Force -Verbose -Type MultiString
+# # # Ensure the registry key path exists
+# # if (-not (Test-Path $ldapRegistryPath)) {
+# #     New-Item -Path $ldapRegistryPath -Force | Out-Null
+# # }
+# # try{
+# # Set-ItemProperty -Path $ldapRegistryPath -Name "LdapHost" -Value "10.0.0.30" -Force -Verbose -Type MultiString
 
-# Set-ItemProperty -Path $ldapRegistryPath -Name "GroupDnPattern" -Value "cn=Users,cn=Authull3,cn=com" -Force -Verbose
+# # Set-ItemProperty -Path $ldapRegistryPath -Name "GroupDnPattern" -Value "cn=Users,cn=Authull3,cn=com" -Force -Verbose
 
-# Set-ItemProperty -Path $ldapRegistryPath -Name "DnPattern" -Value "CN=%u,CN=Users,DC=authull3,DC=com" -Force -Verbose
+# # Set-ItemProperty -Path $ldapRegistryPath -Name "DnPattern" -Value "CN=%u,CN=Users,DC=authull3,DC=com" -Force -Verbose
 
-# Set-ItemProperty -Path $ldapRegistryPath -Name "SearchDn" -Value "cn=Users,cn=Authull3,cn=com" -Force -Verbose
+# # Set-ItemProperty -Path $ldapRegistryPath -Name "SearchDn" -Value "cn=Users,cn=Authull3,cn=com" -Force -Verbose
 
 # # $multiLineContent1 = @(
 # # "backup11",
@@ -474,13 +474,6 @@ $infFilePath = $OutputPath + "\windows-endpoint-main\gpo\securitySettings.inf"
 
 
 # Write-Host "Registry values have been set successfully." -ForegroundColor Green
-
-# }
-
-
-# #Setting LocalAdminFallback Registry 
-# set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
-# Write-Host "Local Admin Fallback registry added successfully.." -ForegroundColor Green
 # Define the path to your registry file
 $registryFilePath = $OutputPath +"\windows-endpoint-main\gpo\pgina.reg"
 
@@ -493,6 +486,30 @@ if (Test-Path $registryFilePath) {
     Write-Output "Registry file imported successfully."
 } else {
     Write-Output "Registry file not found: $registryFilePath"
+}
+
+
+
+
+#Setting LocalAdminFallback Registry 
+set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
+Write-Host "Local Admin Fallback registry added successfully.." -ForegroundColor Green
+
+if (-not (Test-Path $ldapRegistryPath)) {
+     New-Item -Path $ldapRegistryPath -Force | Out-Null
+}
+
+$registryFilePath = $OutputPath +"\windows-endpoint-main\gpo\ldap.reg"
+
+# Check if the file exists
+if (Test-Path $registryFilePath) {
+    # Import the registry file using regedit
+    Start-Process -FilePath "regedit.exe" -ArgumentList "/s `"$registryFilePath`"" -Wait
+
+    # Optionally, check if the import was successful
+    Write-Output "ldap Registry file imported successfully."
+} else {
+    Write-Output " ldap Registry file not found: $registryFilePath"
 }
 
 #---------------------------------------------------------------------------------------------
