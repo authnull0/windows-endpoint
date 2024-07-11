@@ -77,7 +77,7 @@ if(Test-Path $pginaPath)
 }
 
 #Deleting dlls
-$files = @("C:\Windows\System32\golib.dll", "C:\Windows\System32\pGinaGINA.dll", "C:\Windows\System32\pGinaCredentialProvider.dll")
+$files = @("C:\Windows\System32\golib.dll", "C:\Windows\System32\pGinaGINA.dll")
 
 foreach ($file in $files) {
     if (Test-Path -Path $file) {
@@ -210,7 +210,7 @@ try {
 }
  
 #---------------------------------------------------------------------------
-Write-Host "Extracting agent"
+Write-Host "Extracting agent" -ForegroundColor Yellow
 
 $AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build.zip"
 
@@ -400,11 +400,13 @@ $destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
 Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDirectory -Force -Verbose -Type MultiString 
     
 $value = "0x000000e"
+Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value $value -Force -Verbose -Type DWORD 
 Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
 
 
 #plugin order
 $multiLineContent = @"
+"0f52390b-c781-43ae-bd62-553c77fa4cf7"
 12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
 "@
 
@@ -413,39 +415,57 @@ Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Orde
 Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
 
-<#disabling the credential provider
-# Define an array of key-value pairs
-$keyValuePairs = @"
-{1b283861-754f-4022-ad47-a5eaaa618894}	3
-{1ee7337f-85ac-45e2-a23c-37c753209769}	3
-{2135f72a-90b5-4ed3-a7f1-8bb705ac276a}	3
-{25cbb996-92ed-457e-b28c-4774084bd562}	3
-{27fbdb57-b613-4af2-9d7e-4fa7a66c21ad}	3
-{3dd6bec0-8193-4ffe-ae25-e08e39ea4063}	3
-{48b4e58d-2791-456c-9091-d524c6c706f2}	3
-{600e7adb-da3e-41a4-9225-3c0399e88c0c}	3
-{60b78e88-ead8-445c-9cfd-0b87f74ea6cd}	3
-{8fd7e19c-3bf7-489b-a72c-846ab3678c96}	3
-{94596c7e-3744-41ce-893e-bbf09122f76a}	3
-{bec09223-b018-416d-a0ac-523971b639f5}	3
-{c5d7540a-cd51-453b-b22b-05305ba03f07}	3
-{cb82ea12-9f71-446d-89e1-8d0924e1256e}	3
-{d6886603-9d2f-4eb2-b667-1971041fa96b}	3
-{e74e57b0-6c6d-44d5-9cda-fb2df5ed7435}	3
-{f64945df-4fa9-4068-a2fb-61af319edd33}	3
-{f8a0b131-5f68-486c-8040-7e8fc3c85bb6}	3
-{f8a1793b-7873-4046-b2a7-1f318747f427}	3
+# Step 3: Verify LDAP authentication configuration
+$ldapRegistryPath = "HKLM:\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
+Set-ItemProperty -Path $ldapRegistryPath -Name "LdapHost" -Value "10.0.0.30" -Force
 
-"@
+Set-ItemProperty -Path $ldapRegistryPath -Name "GroupDnPattern" -Value "cn=Users,cn=Authull3,cn=com" -Force -Verbose
+
+Set-ItemProperty -Path $ldapRegistryPath -Name "DnPattern" -Value "CN=%u,CN=Users,DC=authull3,DC=com" -Force -Verbose
+
+Set-ItemProperty -Path $ldapRegistryPath -Name "SearchDn" -Value "cn=Users,cn=Authull3,cn=com" -Force -Verbose
+
+#Set-ItemProperty -Path $ldapRegistryPath -Name "LdapPort" -Value 389 -Force -Verbose -Type 
+
+Write-Host "LDAP configuration updated successfully." -ForegroundColor Green
+
+#Set-ItemProperty -Path $ldapRegistryPath -Name "LdapPort" -Value 389 -Force -Verbose -Type 
+$multiLineContent1 = @(
+"backup11"
+"21"
+)
+
+Set-ItemProperty -Path $ldapRegistryPath -Name "GroupAuthzRules" -Value $multiLineContent1 -Force -Verbose -Type MultiString
+
+$multiLineContent2 = @(
+"2Users",
+"2Administrators"
+)
+
+Set-ItemProperty -Path $ldapRegistryPath -Name "GroupGatewayRules" -Value $multiLineContent2 -Type MultiString -Force -Verbose 
+
+Write-Host "LDAP configuration updated successfully." -ForegroundColor Green
+
+#disabling the credential provider
+# Define an array of key-value pairs
+$registryKeyPath =  "HKLM:\Software\Pgina3"
+$keyValuePairs = @(
+"{01a30791-40ae-4653-ab2e-fd210019ae88}	15",
+"{1b283861-754f-4022-ad47-a5eaaa618894}	15",
+"{1ee7337f-85ac-45e2-a23c-37c753209769}	3"
+)
 Set-ItemProperty -Path $registryKeyPath -Name "CredentialProviderFilters" -Value $keyValuePairs -Force -Verbose -Type MultiString 
 
 
 Write-Host "Registry values have been set successfully." -ForegroundColor Green
-#>
-}
-#Setting LocalAdminFallback Registry 
 
- set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
+}
+
+
+#Setting LocalAdminFallback Registry 
+set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
+Write-Host "Local Admin Fallback registry added successfully.." -ForegroundColor Green
+
 #---------------------------------------------------------------------------------------------
 #updating group policy to update seucrity settings
 Write-Host "Do you want to enable local policy configuration for LDAP users to login locally(Optional)? Press Y/N" -ForegroundColor Green
