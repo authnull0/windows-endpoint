@@ -379,134 +379,63 @@ $lgpoPath = $OutputPath+"\windows-endpoint-main\gpo\LGPO.exe"
 $backupFolder = $OutputPath+"\windows-endpoint-main\gpo\registry.pol"
 $infFilePath = $OutputPath + "\windows-endpoint-main\gpo\securitySettings.inf"
     
-        try{
-        Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
-        Write-Host "Security settings installed successfully." -ForegroundColor Green
-        } 
-        catch{
-            Write-Host "Security setting installation failed : $_" -ForegroundColor Red
-        }
-    try{
+try{
+    Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
+    Write-Host "Security settings installed successfully." -ForegroundColor Green
+    } 
+catch{
+        Write-Host "Security setting installation failed : $_" -ForegroundColor Red
+    }
+
+try{
     Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
     Write-Host "Group policy updated sucessfully." -ForegroundColor Green
-    }
-    catch{
+}
+catch{
     Write-Host "Group policy updation failed: $_" -ForegroundColor Red
-    }           
+}           
     
 #---------------------------------------------------------------------
-# #Configuring pGina
-# Write-Host "Do you want to configure Authnull to manage local users? Press Y/N" -ForegroundColor Green
-# $choice = Read-Host 
-# if($choice -eq 'Y'){
-# $registryKeyPath =  "HKLM:\Software\Pgina3"
-
-# # Define the name of the multi-string value
-# $valueName = "PluginDirectories"
-# $destinationDirectory = "C:\program files\pGina\plugins\authnull-plugins"
-# Set-ItemProperty -Path $registryKeyPath -Name $valueName -Value $destinationDirectory -Force -Verbose -Type MultiString 
-    
-# $value = "0x000000e"
-# Set-ItemProperty -Path $registryKeyPath -Name "0f52390b-c781-43ae-bd62-553c77fa4cf7" -Value $value -Force -Verbose -Type DWORD 
-# Set-ItemProperty -Path $registryKeyPath -Name "12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Value $value -Force -Verbose -Type DWORD 
-
-
-# #plugin order
-# $multiLineContent = @"
-# 0f52390b-c781-43ae-bd62-553c77fa4cf7
-# 12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d
-# "@
-
-# Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthentication_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-# Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthenticationGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-# Set-ItemProperty -Path $registryKeyPath -Name "IPluginAuthorization_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-# Set-ItemProperty -Path $registryKeyPath -Name "IPluginGateway_Order" -Value $multiLineContent -Force -Verbose -Type MultiString 
-
-# # Step 3: Verify LDAP authentication configuration
-# # $ldapRegistryPath = "HKLM:\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
-
-# # # Ensure the registry key path exists
-# # if (-not (Test-Path $ldapRegistryPath)) {
-# #     New-Item -Path $ldapRegistryPath -Force | Out-Null
-# # }
-# # try{
-# # Set-ItemProperty -Path $ldapRegistryPath -Name "LdapHost" -Value "10.0.0.30" -Force -Verbose -Type MultiString
-
-# # Set-ItemProperty -Path $ldapRegistryPath -Name "GroupDnPattern" -Value "cn=Users,cn=Authull3,cn=com" -Force -Verbose
-
-# # Set-ItemProperty -Path $ldapRegistryPath -Name "DnPattern" -Value "CN=%u,CN=Users,DC=authull3,DC=com" -Force -Verbose
-
-# # Set-ItemProperty -Path $ldapRegistryPath -Name "SearchDn" -Value "cn=Users,cn=Authull3,cn=com" -Force -Verbose
-
-# # $multiLineContent1 = @(
-# # "backup11",
-# # "21"
-# # )
-
-# # Set-ItemProperty -Path $ldapRegistryPath -Name "GroupAuthzRules" -Value $multiLineContent1 -Force -Verbose -Type MultiString
-
-# # $multiLineContent2 = @(
-# # "2Users",
-# # "2Administrators"
-# # )
-
-# # Set-ItemProperty -Path $ldapRegistryPath -Name "GroupGatewayRules" -Value $multiLineContent2 -Type MultiString -Force -Verbose 
-
-# Write-Host "LDAP configuration updated successfully." -ForegroundColor Green
-# }
-
-# catch{
-#     Write-Host "Failed to config Ldap: $_" -ForegroundColor Red
-# }
-# Write-Host "LDAP configuration updated successfully." -ForegroundColor Green
-
-# #disabling the credential provider
-# # Define an array of key-value pairs
-# #$registryKeyPath =  "HKLM:\Software\Pgina3"
-# # $keyValuePairs = @(
-# # "{01a30791-40ae-4653-ab2e-fd210019ae88}	15",
-# # "{1b283861-754f-4022-ad47-a5eaaa618894}	15",
-# # "{1ee7337f-85ac-45e2-a23c-37c753209769}	3"
-# # )
-
-# # $keyValuePairs = "{01a30791-40ae-4653-ab2e-fd210019ae88}	15"
-# # Set-ItemProperty -Path $registryKeyPath -Name "CredentialProviderFilters" -Value $keyValuePairs -Force -Verbose -Type MultiString 
-
-
-# Write-Host "Registry values have been set successfully." -ForegroundColor Green
+Write-Host "Configuring pgina for both local user and AD user authentication" -ForegroundColor Green
 # Define the path to your registry file
 $registryFilePath = $OutputPath +"\windows-endpoint-main\gpo\pgina.reg"
 
 # Check if the file exists
+try{
 if (Test-Path $registryFilePath) {
     # Import the registry file using regedit
     Start-Process -FilePath "regedit.exe" -ArgumentList "/s `"$registryFilePath`"" -Wait
 
     # Optionally, check if the import was successful
-    Write-Output "Registry file imported successfully."
+    Write-Host "Registry file imported successfully." -ForegroundColor Green
 } else {
-    Write-Output "Registry file not found: $registryFilePath"
+    Write-Output "Registry file not found: $registryFilePath" -ForegroundColor Red
+}
 }
 
-
-
-
+catch{
+    Write-Host "Failed to update registry : $_" -ForegroundColor Red
+}
+#-----------------------------------------------------------------------
 #Setting LocalAdminFallback Registry 
 set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
 Write-Host "Local Admin Fallback registry added successfully.." -ForegroundColor Green
+#--------------------------------------------------------------------------------
 
-
+Write-Host "LDAP Plugin Settings" -ForegroundColor Green
 $registryFilePath = $OutputPath +"\windows-endpoint-main\gpo\ldap.reg"
-
+try{
 # Check if the file exists
 if (Test-Path $registryFilePath) {
     # Import the registry file using regedit
     Start-Process -FilePath "regedit.exe" -ArgumentList "/s `"$registryFilePath`"" -Wait
-
-    # Optionally, check if the import was successful
-    Write-Output "ldap Registry file imported successfully."
+    Write-Host "Ldap Registry file imported successfully." -ForegroundColor Green
 } else {
-    Write-Output " ldap Registry file not found: $registryFilePath"
+    Write-Output " ldap Registry file not found: $registryFilePath" -ForegroundColor Red
+}
+}
+catch{
+    Write-Host "Failed to update LDAP registry : $_" -ForegroundColor Red
 }
 
 #---------------------------------------------------------------------------------------------
