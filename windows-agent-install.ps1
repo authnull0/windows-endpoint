@@ -495,9 +495,6 @@ if (Test-Path $registryFilePath) {
 set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
 Write-Host "Local Admin Fallback registry added successfully.." -ForegroundColor Green
 
-if (-not (Test-Path $ldapRegistryPath)) {
-     New-Item -Path $ldapRegistryPath -Force | Out-Null
-}
 
 $registryFilePath = $OutputPath +"\windows-endpoint-main\gpo\ldap.reg"
 
