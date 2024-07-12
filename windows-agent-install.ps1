@@ -150,64 +150,65 @@ else {
 }
 
 #---------------------------------------------------------------------------------
-#Specify the file path where you want to save the content
- 
 # Define the path where the environment file should be saved
-
-if (-not (Test-Path -Path "C:\authnull-agent" -PathType Container)) {
+if (-not (Test-Path -Path "C:\authnull-agent\app.env" -PathType Leaf)) {
     try {
-        New-Item -Path "C:\authnull-agent" -ItemType Directory -Force | Out-Null
-        Write-Host "Created directory: C:\authnull-agent" -ForegroundColor Green
+        New-Item -Path "C:\authnull-agent\app.env" -ItemType File -Force | Out-Null
+        Write-Host "Created file: C:\authnull-agent\app.env" -ForegroundColor Green
     } catch {
-        Write-Host "Failed to create directory: $_" -ForegroundColor Red
+        Write-Host "Failed to create app.env: $_" -ForegroundColor Red
         exit
     }
 }
 
-$envFilePath = "C:\authnull-agent\app.env"
-$envCount=0
-$blank="_"
-Write-Host "Please enter the content for the text file. Press Enter on a blank line to finish. Ensure the first line is not blank."
-$envContent = ""
-do {
-    $line = Read-Host
-    if (-not [string]::IsNullOrEmpty($line)) {
-        $envContent += "$line`n" # Append the line to the text blob
-    } else {
-            $envCount=$envCount+1
-            if ($envCount -gt 1) { 
-                $blank=""
-            }
-    }
-} while (-not [string]::IsNullOrEmpty($blank))
 
-# Define the path for the text file
-$agentFile = "C:\authnull-agent\app.env"
+Write-Host "Copy and paste the content to C:\authnull-agent\app.env file. Ensure the first line is not blank. Save the file..." -ForegroundColor Green
+Read-Host "After saving the file press ENTER to continue" 
 
-# Write the text blob to the text file
-try {
-   # $envContent | Out-File -FilePath $agentFile -Encoding utf8
-    if (-not [string]::IsNullOrEmpty($envContent)) {
-        $envContent | Out-File -FilePath $agentFile -Encoding utf8
-        Write-Host "Config saved successfully to: $agentFile" -ForegroundColor Green
-    } else {
-        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
-    }
-} catch {
-    Write-Host "Failed to save Config: $_" -ForegroundColor Red
-}
-# Create or overwrite the environment file with the provided content
-try {
+#$envFilePath = "C:\authnull-agent\app.env"
+# $envCount=0
+# $blank="_"
+# Write-Host "Please enter the content for the text file. Press Enter on a blank line to finish. Ensure the first line is not blank."
+# $envContent = ""
+# do {
+#     $line = Read-Host
+#     if (-not [string]::IsNullOrEmpty($line)) {
+#         $envContent += "$line`n" # Append the line to the text blob
+#     } else {
+#             $envCount=$envCount+1
+#             if ($envCount -gt 1) { 
+#                 $blank=""
+#             }
+#     }
+# } while (-not [string]::IsNullOrEmpty($blank))
+
+# # Define the path for the text file
+# $agentFile = "C:\authnull-agent\app.env"
+
+# # Write the text blob to the text file
+# try {
+#    # $envContent | Out-File -FilePath $agentFile -Encoding utf8
+#     if (-not [string]::IsNullOrEmpty($envContent)) {
+#         $envContent | Out-File -FilePath $agentFile -Encoding utf8
+#         Write-Host "Config saved successfully to: $agentFile" -ForegroundColor Green
+#     } else {
+#         Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+#     }
+# } catch {
+#     Write-Host "Failed to save Config: $_" -ForegroundColor Red
+# }
+# # Create or overwrite the environment file with the provided content
+# try {
    
-    if (-not [string]::IsNullOrEmpty($envContent)) {
-        $envContent | Out-File -FilePath $envFilePath -Encoding utf8
-        Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
-    } else {
-        Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
-    }
-} catch {
-    Write-Host "Failed to save Config: $_" -ForegroundColor Red
-}
+#     if (-not [string]::IsNullOrEmpty($envContent)) {
+#         $envContent | Out-File -FilePath $envFilePath -Encoding utf8
+#         Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
+#     } else {
+#         Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+#     }
+# } catch {
+#     Write-Host "Failed to save Config: $_" -ForegroundColor Red
+# }
  
 #---------------------------------------------------------------------------
 Write-Host "Extracting agent" -ForegroundColor Yellow
