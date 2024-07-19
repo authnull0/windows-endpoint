@@ -5,14 +5,10 @@ echo "hello, Starting the Assertion"
 user=$1
 source_ip=$2
 
-# Prompt for orgId and tenantId
-read -p "Enter orgId: " orgId
-read -p "Enter tenantId: " tenantId
 
 echo "User: $user"
 echo "Source IP: $source_ip"
-echo "Org ID: $orgId"
-echo "Tenant ID: $tenantId"
+
 
 string=$(groups $USER)
 prefix="$USER : "
@@ -48,8 +44,8 @@ generate_post_data() {
   "credentialType": "$credentialType",
   "hostname": "$(echo ${hoststr})",
   "groupName": "$(echo ${value})",
-  "orgId": $orgId,
-  "tenantId": $tenantId,
+  "orgId": 84,
+  "tenantId": 7,
   "requestId": "$(echo $uuid)",
   "sourceIp": "$(echo ${source_ip})"
 }
