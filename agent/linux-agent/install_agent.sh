@@ -1,21 +1,31 @@
 #!/bin/bash
 
 # Download the agent file
-sudo wget https://github.com/authnull0/windows-endpoint/raw/linux-agent/agent/linux-agent/agentv2
+sudo wget https://github.com/authnull0/windows-endpoint/raw/linux-agent/agent/linux-agent/agentv2 -O agentv2
 
-# Read multiple lines of input
-app_env_content=""
-while IFS= read -r line; do
-    app_env_content+="$line"$'\n'
-done
 
-# Create the app.env file with the provided content
-echo "$app_env_content" > app.env
+
+# Prompt for app.env file content
+echo "Please enter the content for the app.env file. End with an empty line or Ctrl+D:"
+
+# Create the app.env file and read the input directly into it
+cat > app.env
+
+# Check if the app.env file is not empty
+if [ ! -s app.env ]; then
+    echo "No content provided for app.env or file is empty. Exiting."
+    exit 1
+fi
 
 # Make the agent file executable
 sudo chmod +x agentv2
 
+
+
 # Run the agent
 ./agentv2
+
+
+
 
 
