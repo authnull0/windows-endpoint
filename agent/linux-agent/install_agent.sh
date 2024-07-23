@@ -9,7 +9,7 @@ sudo wget https://github.com/authnull0/windows-endpoint/raw/linux-agent/agent/li
 echo "Please enter the content for the app.env file. End with an empty line or Ctrl+D:"
 
 # Create the app.env file and read the input directly into it
-cat > app.env
+cat | tee app.env
 
 
 # Make the agent file executable
