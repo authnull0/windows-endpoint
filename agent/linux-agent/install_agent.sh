@@ -3,9 +3,11 @@
 # Download the agent file
 sudo wget https://github.com/authnull0/windows-endpoint/raw/linux-agent/agent/linux-agent/agentv2
 
-# Prompt for app.env file content
-echo "Please enter the content for the app.env file:"
-read -r app_env_content
+# Read multiple lines of input
+app_env_content=""
+while IFS= read -r line; do
+    app_env_content+="$line"$'\n'
+done
 
 # Create the app.env file with the provided content
 echo "$app_env_content" > app.env
