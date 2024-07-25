@@ -136,15 +136,15 @@ Windows Registry Editor Version 5.00
 [HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins]
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d]
-"AlwaysAuthenticate"="True"
+"AlwaysAuthenticate"="False"
 "AuthzLocalAdminsOnly"="False"
 "AuthzLocalGroupsOnly"="False"
 "AuthzLocalGroups"=hex(7):00,00
 "AuthzApplyToAllUsers"="True"
 "MirrorGroupsForAuthdUsers"="True"
-"GroupCreateFailIsFail"="True"
+"GroupCreateFailIsFail"="False"
 "MandatoryGroups"=hex(7):00,00
-"RemoveProfiles"="False"
+"RemoveProfiles"="True"
 "ScramblePasswords"="False"
 "ScramblePasswordsWhenLMAuthFails"="True"
 "ScramblePasswordsExceptions"=hex(7):00,00
