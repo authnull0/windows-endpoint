@@ -378,7 +378,7 @@ Write-Host "Copied dependencies successfully." -ForegroundColor Green
 
 $lgpoPath = $OutputPath+"\windows-endpoint-main\gpo\LGPO.exe"
 $backupFolder = $OutputPath+"\windows-endpoint-main\gpo\registry.pol"
-$infFilePath = $OutputPath + "\windows-endpoint-main\gpo\securitySettings.inf"
+$infFilePath = $OutputPath + "\windows-endpoint-main\gpo\security.inf"
     
 try{
     Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
