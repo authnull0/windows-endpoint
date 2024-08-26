@@ -162,7 +162,7 @@ if (-not (Test-Path -Path "C:\authnull-agent\app.env" -PathType Leaf)) {
 }
 
 
-Write-Host "Copy and paste the content to C:\authnull-agent\app.env file. Ensure the first line is not blank. Save the file..." -ForegroundColor Green
+Write-Host "Copy and paste the content to C:\authnull-agent\app.env file. Ensure the first line is not blank. Save the file..." -ForegroundColor Yellow
 Read-Host "After saving the file press ENTER to continue" 
 
 #$envFilePath = "C:\authnull-agent\app.env"
@@ -439,12 +439,23 @@ catch{
     Write-Host "Failed to update LDAP registry : $_" -ForegroundColor Red
 }
 #---------------------------------------------------------------------------------------
+
+# Start the process again
+try{
+    Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
+    Write-Host "Restarting pGina" -ForegroundColor Green
+    
+    }
+    catch{
+        Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
+    }
+#------------------------------------------------------------------------------  
 #update the LDAP configuration settings
 # Define the registry key path
 $registryKeyPath = "HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
 
 # Define the name of the multi-string value
-$valueName =   Read-Host "Please enter a DN pattern"
+$valueName =   Read-Host "Please enter a DN pattern"  -ForegroundColor Green
 
 # Define the new value data
 $newValueData = @(
@@ -453,6 +464,9 @@ $newValueData = @(
 
 
 Set-ItemProperty -Path $registryKeyPath -Name "DnPattern" -Value $newValueData
+
+$valueName =   Read-Host "Please enter a Group DN pattern" -ForegroundColor Green
+
 # Define the new value data
 $newValueData = @(
     $valueName 
@@ -463,7 +477,7 @@ Set-ItemProperty -Path $registryKeyPath -Name "GroupDNPattern" -Value $newValueD
 
 # Define the name of the multi-string value\\
 
-$valueName =   Read-Host "Please enter a search DN pattern"
+$valueName =   Read-Host "Please enter a search DN pattern" -ForegroundColor Green
 
 # Define the new value data
 $newValueData = @(
@@ -471,7 +485,7 @@ $newValueData = @(
 )
 Set-ItemProperty -Path $registryKeyPath -Name "SearchDN" -Value  $newValueData
 
-$valueName =   Read-Host "Please enter a LDAP Host URL"
+$valueName =   Read-Host "Please enter a LDAP Host URL" -ForegroundColor Green
 
 # Define the new value data
 $newValueData = @(
@@ -482,20 +496,8 @@ Set-ItemProperty -Path $registryKeyPath -Name "LdapHost" -Value $newValueData
 
 
  
-Write-Host "Configured LDAP Successfully.." -ForegroundColor Red
+Write-Host "Configured LDAP Successfully.." -ForegroundColor Green
 
-
-
-#---------------------------------------------------------------------------------------------
-# Start the process again
-try{
-Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
-Write-Host "Restarting pGina" -ForegroundColor Green
-
-}
-catch{
-    Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
-}
 <#------------------------------------------------------------------------------------------------------------------------------------
 Restart Computer
 try{
