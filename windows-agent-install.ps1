@@ -438,6 +438,53 @@ if (Test-Path $registryFilePath) {
 catch{
     Write-Host "Failed to update LDAP registry : $_" -ForegroundColor Red
 }
+#---------------------------------------------------------------------------------------
+#update the LDAP configuration settings
+# Define the registry key path
+$registryKeyPath = "HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
+
+# Define the name of the multi-string value
+$valueName =   Read-Host "Please enter a DN pattern"
+
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+
+
+Set-ItemProperty -Path $registryKeyPath -Name "DnPattern" -Value $newValueData
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+
+Set-ItemProperty -Path $registryKeyPath -Name "GroupDNPattern" -Value $newValueData 
+
+
+# Define the name of the multi-string value\\
+
+$valueName =   Read-Host "Please enter a search DN pattern"
+
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+Set-ItemProperty -Path $registryKeyPath -Name "SearchDN" -Value  $newValueData
+
+$valueName =   Read-Host "Please enter a LDAP Host URL"
+
+# Define the new value data
+$newValueData = @(
+    $valueName 
+)
+
+Set-ItemProperty -Path $registryKeyPath -Name "LdapHost" -Value $newValueData 
+
+
+ 
+Write-Host "Configured LDAP Successfully.." -ForegroundColor Red
+
+
 
 #---------------------------------------------------------------------------------------------
 # Start the process again
