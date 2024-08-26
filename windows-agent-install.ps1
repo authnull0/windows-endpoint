@@ -497,6 +497,8 @@ Set-ItemProperty -Path $registryKeyPath -Name "LdapHost" -Value $newValueData
 
  
 Write-Host "Configured LDAP Successfully.." -ForegroundColor Green
+Write-Host "Restart your system to apply the changes.." -ForegroundColor Green
+
 
 <#------------------------------------------------------------------------------------------------------------------------------------
 Restart Computer
