@@ -451,61 +451,60 @@ try{
     }
 #------------------------------------------------------------------------------  
 #update the LDAP configuration settings
-# Define the registry key path
-$registryKeyPath = "HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
+#Ldap Registry Path
+$registryKeyPath = "HKLM:\SOFTWARE\pGina3\Plugins\0f52390b-c781-43ae-bd62-553c77fa4cf7"
+# Env file Path
+$envFilePath = "C:\authnull-agent\app.env"
 
-# Define the name of the multi-string value
-$valueName =   Read-Host "Please enter a DN pattern"  -ForegroundColor Green
+# Read the file content
+$envContent = Get-Content -Path $envFilePath
 
-# Define the new value data
-$newValueData = @(
-    $valueName 
-)
+# Dictionary to store the key-value pairs
+$envDict = @{}
 
+foreach ($line in $envContent) {
+    if ($line -match "=") {
+        # Split only on the first '=' to correctly parse the key-value pair
+        $key, $value = $line -split "=", 2
+        $key = $key.Trim()
+        $value = $value.Trim()
+        $envDict[$key] = $value
+    }
+}
 
-Set-ItemProperty -Path $registryKeyPath -Name "DnPattern" -Value $newValueData
+#Keys and their corresponding registry names
+$expectedKeys = @{
+    "LDAP_HOST"        = "LdapHost"
+    "LDAP_PORT"        = "LdapPort"
+    "SEARCH_DN"        = "SearchDn"
+    "GROUP_DN_PATTERN" = "GroupDnPattern"
+    "USER_DN_PATTERN"  = "DnPattern"
+}
 
-$valueName =   Read-Host "Please enter a Group DN pattern" -ForegroundColor Green
+# Loop through the expected keys and update the registry
+foreach ($key in $expectedKeys.Keys) {
+    if ($envDict.ContainsKey($key)) {
+       
+        $value = $envDict[$key]
+    } else {
+        
+        $value = Read-Host "Enter value for $key"
+    }
+    
+   
+    Set-ItemProperty -Path $registryKeyPath -Name $expectedKeys[$key] -Value $value
+}
 
-# Define the new value data
-$newValueData = @(
-    $valueName 
-)
-
-Set-ItemProperty -Path $registryKeyPath -Name "GroupDNPattern" -Value $newValueData 
-
-
-# Define the name of the multi-string value\\
-
-$valueName =   Read-Host "Please enter a search DN pattern" -ForegroundColor Green
-
-# Define the new value data
-$newValueData = @(
-    $valueName 
-)
-Set-ItemProperty -Path $registryKeyPath -Name "SearchDN" -Value  $newValueData
-
-$valueName =   Read-Host "Please enter a LDAP Host URL" -ForegroundColor Green
-
-# Define the new value data
-$newValueData = @(
-    $valueName 
-)
-
-Set-ItemProperty -Path $registryKeyPath -Name "LdapHost" -Value $newValueData 
-
-
- 
-Write-Host "Configured LDAP Successfully.." -ForegroundColor Green
+Write-Host "Configured LDAP Plugins Successfully.." -ForegroundColor Green
 Write-Host "Restart your system to apply the changes.." -ForegroundColor Green
 
-
-<#------------------------------------------------------------------------------------------------------------------------------------
-Restart Computer
+#------------------------------------------------------------------------------------------------------------------------------------
+#Restart Computer
+Read-Host "Press ENTER to Restart your system" -ForegroundColor Green
 try{
     Restart-Computer -Force
 }
 catch{
     Write-Host "Restarting computer failed: $_" -ForegroundColor Red
 }
-#>
+
