@@ -491,16 +491,21 @@ foreach ($key in $expectedKeys.Keys) {
         $value = Read-Host "Enter value for $key"
     }
     
-   
-    Set-ItemProperty -Path $registryKeyPath -Name $expectedKeys[$key] -Value $value
+    if ($key -eq "LDAP_PORT") {
+        # $value = "{0:x}" -f [int]$value
+        Set-ItemProperty -Path $registryKeyPath -Name $expectedKeys[$key] -Value $value -Force -Type DWORD 
+    }
+
+    Set-ItemProperty -Path $registryKeyPath -Name $expectedKeys[$key] -Value $value -Force 
 }
 
 Write-Host "Configured LDAP Plugins Successfully.." -ForegroundColor Green
 Write-Host "Restart your system to apply the changes.." -ForegroundColor Green
 
+
 #------------------------------------------------------------------------------------------------------------------------------------
 #Restart Computer
-Read-Host "Press ENTER to Restart your system" -ForegroundColor Green
+Read-Host "Press ENTER to Restart your system" 
 try{
     Restart-Computer -Force
 }
