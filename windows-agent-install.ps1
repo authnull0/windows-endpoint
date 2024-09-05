@@ -161,10 +161,6 @@ else {
 #     }
 # }
 
-
-# Write-Host "Copy and paste app.env to C:\authnull-agent "-ForegroundColor Green
-# Read-Host "After saving the file press ENTER to continue" 
-
 # Define the source path in the current working directory
 $sourcePath = (Get-Location).Path + "\app.env"
 $destinationPath = "C:\authnull-agent\app.env"
@@ -507,20 +503,12 @@ Write-Host "Restart your system to apply the changes.." -ForegroundColor Green
 
 
 #------------------------------------------------------------------------------------------------------------------------------------
-# Start the process again
-try{
-    Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
-    Write-Host "Restarting pGina" -ForegroundColor Green
-    
-    }
-    catch{
-        Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
-    }
-#------------------------------------------------------------------------------  
 #Restart Computer
+
 try{
     Write-Host "Waiting for 10 seconds before restarting..." -ForegroundColor Yellow
     Start-Sleep -Seconds 10
+    Restart-Computer -Force
 }
 catch{
     Write-Host "Restarting computer failed: $_" -ForegroundColor Red
