@@ -52,7 +52,7 @@ $uninstallPath = "C:\Program Files\pGina\unins000.exe"
 if (Test-Path $uninstallPath -PathType Leaf) {
     try{
     # Start the uninstaller process
-    Write-Host "Uninstalling the already configured pGina" -ForegroundColor Yellow
+    Write-Host "Uninstalling previously configured pGina" -ForegroundColor Yellow
     Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -Wait
     Write-Host "pGina uninstalled successfully." -ForegroundColor Green
 }
@@ -104,7 +104,7 @@ if (Test-Path -Path $RegistryKeyPath) {
     try{
     # Remove the registry key and all its subkeys and values
     Remove-Item -Path $RegistryKeyPath -Recurse -Force
-    Write-Host "Registry key and all subkeys and values deleted successfully." -ForegroundColor Green
+    Write-Host "Registry keys and values deleted successfully." -ForegroundColor Green
     }
 
     catch{
@@ -151,21 +151,34 @@ else {
 
 #---------------------------------------------------------------------------------
 # Define the path where the environment file should be saved
-if (-not (Test-Path -Path "C:\authnull-agent\app.env" -PathType Leaf)) {
-    try {
-        New-Item -Path "C:\authnull-agent\app.env" -ItemType File -Force | Out-Null
-        Write-Host "Created file: C:\authnull-agent\app.env" -ForegroundColor Green
-    } catch {
-        Write-Host "Failed to create app.env: $_" -ForegroundColor Red
-        exit
-    }
+# if (-not (Test-Path -Path "C:\authnull-agent\app.env" -PathType Leaf)) {
+#     try {
+#         New-Item -Path "C:\authnull-agent\app.env" -ItemType File -Force | Out-Null
+#         Write-Host "Created file: C:\authnull-agent\app.env" -ForegroundColor Green
+#     } catch {
+#         Write-Host "Failed to create app.env: $_" -ForegroundColor Red
+#         exit
+#     }
+# }
+
+
+# Write-Host "Copy and paste app.env to C:\authnull-agent "-ForegroundColor Green
+# Read-Host "After saving the file press ENTER to continue" 
+
+# Define the source path in the current working directory
+$sourcePath = (Get-Location).Path + "\app.env"
+$destinationPath = "C:\authnull-agent\app.env"
+
+# Check if the source file exists
+if (Test-Path $sourcePath) {
+   
+    Copy-Item -Path $sourcePath -Destination $destinationPath -Force
+    Write-Host "File app.env has been copied to C:\authnull-agent successfully." -ForegroundColor Green
+} else {
+    # If the file doesn't exist, stop the script
+    Write-Host "File app.env not found in the current working directory. The script cannot proceed." -ForegroundColor Red
+    exit
 }
-
-
-Write-Host "Copy and paste the content to C:\authnull-agent\app.env file. Ensure the first line is not blank. Save the file..." -ForegroundColor Yellow
-Read-Host "After saving the file press ENTER to continue" 
-
-#$envFilePath = "C:\authnull-agent\app.env"
 # $envCount=0
 # $blank="_"
 # Write-Host "Please enter the content for the text file. Press Enter on a blank line to finish. Ensure the first line is not blank."
@@ -259,7 +272,7 @@ if (-not $InstallerPath) {
 if (Test-Path $InstallerPath) {
 #Installing pGina
 $InstallerPath= $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
-Write-Host "After installation completed please CLOSE the pGina" -ForegroundColor Yellow
+Write-Host "Please close the pGina after installation.." -ForegroundColor Green
 if (-not $InstallerPath) {
     Write-Host "Installation path does not exist" -ForegroundColor Yellow
     exit
@@ -390,7 +403,7 @@ catch{
 
 try{
     Start-Process -FilePath $lgpoPath -ArgumentList "/m $backupFolder" -Wait
-    Write-Host "Group policy updated sucessfully." -ForegroundColor Green
+    Write-Host "Group policy updated successfully." -ForegroundColor Green
 }
 catch{
     Write-Host "Group policy updation failed: $_" -ForegroundColor Red
@@ -430,7 +443,7 @@ try{
 if (Test-Path $registryFilePath) {
     # Import the registry file using regedit
     Start-Process -FilePath "regedit.exe" -ArgumentList "/s `"$registryFilePath`"" -Wait
-    Write-Host "Ldap Registry file imported successfully." -ForegroundColor Green
+    #Write-Host "Ldap Registry file imported successfully." -ForegroundColor Green
 } else {
     Write-Output " ldap Registry file not found: $registryFilePath" -ForegroundColor Red
 }
@@ -438,17 +451,7 @@ if (Test-Path $registryFilePath) {
 catch{
     Write-Host "Failed to update LDAP registry : $_" -ForegroundColor Red
 }
-#---------------------------------------------------------------------------------------
 
-# Start the process again
-try{
-    Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
-    Write-Host "Restarting pGina" -ForegroundColor Green
-    
-    }
-    catch{
-        Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
-    }
 #------------------------------------------------------------------------------  
 #update the LDAP configuration settings
 #Ldap Registry Path
@@ -504,10 +507,20 @@ Write-Host "Restart your system to apply the changes.." -ForegroundColor Green
 
 
 #------------------------------------------------------------------------------------------------------------------------------------
-#Restart Computer
-Read-Host "Press ENTER to Restart your system" 
+# Start the process again
 try{
-    Restart-Computer -Force
+    Start-Process -FilePath "C:\Program Files\pGina\pGina.Configuration.exe" -NoNewWindow
+    Write-Host "Restarting pGina" -ForegroundColor Green
+    
+    }
+    catch{
+        Write-Host "Restarting pGina failed: $_" -ForegroundColor Red
+    }
+#------------------------------------------------------------------------------  
+#Restart Computer
+try{
+    Write-Host "Waiting for 10 seconds before restarting..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 10
 }
 catch{
     Write-Host "Restarting computer failed: $_" -ForegroundColor Red
