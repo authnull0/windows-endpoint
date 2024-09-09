@@ -1,18 +1,13 @@
 #single file
-
-
 param (
     [string]$OutputPath
 )
-
 
 # Check if the output path parameter is provided
 if (-not $OutputPath) {
     Write-Host "Please provide the path where you want to save the downloaded file using the -OutputPath parameter." -ForegroundColor Yellow
     exit
 }
-
-
 
 # Check if the output directory exists; if not, create it
 if (-not (Test-Path -Path $OutputPath -PathType Container)) {
@@ -55,8 +50,6 @@ else {
     Write-Host "Zip file not found at: $OutputPath\ad-agent.zip" -ForegroundColor Red
 }
 
-
-
 #create folder C:\authnull-ad-agent
 $FolderPath = "C:\authnull-ad-agent"
 if (-not (Test-Path -Path $FolderPath -PathType Container)) {
@@ -72,42 +65,50 @@ if (-not (Test-Path -Path $FolderPath -PathType Container)) {
     
 }
 
-
 #copy publish folder
-
 $sourceDirectory = $OutputPath + "\windows-endpoint-ad-agent\agent\ad-agent-build"
 Copy-Item -Path "$sourceDirectory\*" -Destination $FolderPath -Recurse -Force -Verbose
 Write-Host "Copied files successfully to the publish folder.." -ForegroundColor Green
 
+# # Prompt the user for input
+# Write-Host "Please copy and paste the content for the conf file. Press Enter twice to finish." -ForegroundColor DarkGreen
 
-# Define the path for the conf file
-$confFilePath = "C:\authnull-ad-agent\agent.conf"
-
-# Prompt the user for input
-Write-Host "Please copy and paste the content for the conf file. Press Enter twice to finish." -ForegroundColor DarkGreen
-
-#Getting the conf file content
-$confContent = ""
-do {
-    $line = Read-Host
-    if (-not [string]::IsNullOrEmpty($line)) {
-        $confContent += "$line`n" # Append the line to the text blob
-    }
-} while (-not [string]::IsNullOrEmpty($line))
+# #Getting the conf file content
+# $confContent = ""
+# do {
+#     $line = Read-Host
+#     if (-not [string]::IsNullOrEmpty($line)) {
+#         $confContent += "$line`n" # Append the line to the text blob
+#     }
+# } while (-not [string]::IsNullOrEmpty($line))
 
 
-# Write the conf file with the provided content
-try {
+# # Write the conf file with the provided content
+# try {
 
-    #check whether the file is empty or not
-    if (-not [string]::IsNullOrEmpty($confContent)) {
-        $confContent | Out-File -FilePath $confFilePath -Encoding utf8
-        Write-Host "Configuration file saved successfully to: $confFilePath" -ForegroundColor Green
-    } else {
-        Write-Host "The content to be written to the file is null or empty." -ForegroundColor Yellow
-    }
-} catch {
-    Write-Host "Failed to save configuration file: $_" -ForegroundColor Red
+#     #check whether the file is empty or not
+#     if (-not [string]::IsNullOrEmpty($confContent)) {
+#         $confContent | Out-File -FilePath $confFilePath -Encoding utf8
+#         Write-Host "Configuration file saved successfully to: $confFilePath" -ForegroundColor Green
+#     } else {
+#         Write-Host "The content to be written to the file is null or empty." -ForegroundColor Yellow
+#     }
+# } catch {
+#     Write-Host "Failed to save configuration file: $_" -ForegroundColor Red
+# }
+
+$sourcePath = (Get-Location).Path + "\agent.conf"
+$destinationPath = "C:\authnull-ad-agent\agent.conf"
+
+# Check if the source file exists
+if (Test-Path $sourcePath) {
+   
+    Copy-Item -Path $sourcePath -Destination $destinationPath -Force
+    Write-Host "File agent.conf has been copied to C:\authnull-ad-agent successfully." -ForegroundColor Green
+} else {
+    # If the file doesn't exist, stop the script
+    Write-Host "File not found in the current working directory. The script cannot proceed." -ForegroundColor Red
+    exit
 }
 #start service
     try{
