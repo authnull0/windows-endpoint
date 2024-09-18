@@ -89,12 +89,12 @@ if (Test-Path $sourcePath) {
  
 #---------------------------------------------------------------------------
 
-$AgentPath= $OutputPath + "\windows-endpoint-main\mysql-db-agent\windows-build\windows-db-agent-amd64.exe"
+$AgentPath= $OutputPath + "\windows-endpoint-mysql-db-agent\agent\windows-build\windows-db-agent.exe"
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
 
 
 try {
-    New-Service -Name "AuthNullDbAgent" -BinaryPathName $OutputPath"\windows-db-agent-amd64.exe" 
+    New-Service -Name "AuthNullDbAgent" -BinaryPathName $OutputPath"\windows-db-agent.exe" 
     Start-Service AuthNullAgent -WarningAction SilentlyContinue
 } catch {
     Write-Host "Registering AuthNull Database Agent failed!" -ForegroundColor Red
