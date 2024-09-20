@@ -86,7 +86,12 @@ if (Test-Path $sourcePath) {
     Write-Host "File app.env not found in the current working directory. The script cannot proceed." -ForegroundColor Red
     exit
 }
- 
+#--------------------------------------------------------------------
+Write-Host ("Copying the agent to $OutputPath") -ForegroundColor Yellow
+#reusing agent path
+$AgentPath= $OutputPath + "\windows-endpoint-mysql-db-agent\agent\windows-build\windows-mysql-db-agent-amd64.exe"
+Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
+
 #---------------------------------------------------------------------------
 # Function to read a password with completely hidden input
 function Read-Password {
