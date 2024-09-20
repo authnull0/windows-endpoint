@@ -43,72 +43,91 @@ catch{
     Write-Host "Failed to create directory: $_ " -ForegroundColor Red
 }
 }
-# # Define the URL of the file to download
-# $url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/mysql-db-agent.zip"
+# Define the URL of the file to download
+$url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/mysql-db-agent.zip"
 
-# # Download the file
+# Download the file
 
-# try {
-#     $webClient = New-Object System.Net.WebClient
-#     $webClient.DownloadFile($url, "$OutputPath\file.zip")
-#     Write-Host "Download completed successfully." -ForegroundColor Green
-# } catch {
-#     Write-Host "Download failed: $_" -ForegroundColor Red
-#     exit
-# }
-
-# if (Test-Path "$OutputPath\file.zip") {
-# # Extract the file
-# try {
-#     Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
-#     Write-Host "Extraction completed successfully." -ForegroundColor Green
-# } catch {
-#     Write-Host "Extraction failed: $_" -ForegroundColor Red
-# }
-# }
-# else {
-#     Write-Host "Zip file not found at: $OutputPath\file.zip" -ForegroundColor Red
-
-# }
-# #----------------------------------------------------------------------------------
-
-# # Define the source path in the current working directory
-# $sourcePath = (Get-Location).Path + "\db.env"
-# $destinationPath = $OutputPath + "\db.env"
-
-# # Check if the source file exists
-# if (Test-Path $sourcePath) {
-   
-#     Copy-Item -Path $sourcePath -Destination $destinationPath -Force
-#     Write-Host "File app.env has been copied to C:\authnull-db-agent successfully." -ForegroundColor Green
-# } else {
-#     # If the file doesn't exist, stop the script
-#     Write-Host "File app.env not found in the current working directory. The script cannot proceed." -ForegroundColor Red
-#     exit
-# }
- 
-#---------------------------------------------------------------------------
-# Prompt the user for runtime inputs
-$DbPort = Read-Host "Enter the database port"
-$DbPassword = Read-Host "Enter the database password"
-$DbHost = Read-Host "Enter the database host"
-$ApiKey = Read-Host "Enter the API key"
-
-# Ensure the agent path is correct
-$agentPath = "C:\authnull-db-agent\agent.exe"
-
-# Check if the agent executable exists
-if (-Not (Test-Path $agentPath)) {
-    Write-Host "Agent executable not found at $agentPath" -ForegroundColor Red
+try {
+    $webClient = New-Object System.Net.WebClient
+    $webClient.DownloadFile($url, "$OutputPath\file.zip")
+    Write-Host "Download completed successfully." -ForegroundColor Green
+} catch {
+    Write-Host "Download failed: $_" -ForegroundColor Red
     exit
 }
 
-# Run the agent with the provided arguments
-& $agentPath --port $DbPort --password $DbPassword --host $DbHost --api_key $ApiKey
-
-# Check the exit code to verify success or failure
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "Agent executed successfully." -ForegroundColor Green
-} else {
-    Write-Host "Agent failed with exit code $LASTEXITCODE." -ForegroundColor Red
+if (Test-Path "$OutputPath\file.zip") {
+# Extract the file
+try {
+    Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
+    Write-Host "Extraction completed successfully." -ForegroundColor Green
+} catch {
+    Write-Host "Extraction failed: $_" -ForegroundColor Red
 }
+}
+else {
+    Write-Host "Zip file not found at: $OutputPath\file.zip" -ForegroundColor Red
+
+}
+#----------------------------------------------------------------------------------
+
+# Define the source path in the current working directory
+$sourcePath = (Get-Location).Path + "\db.env"
+$destinationPath = $OutputPath + "\db.env"
+
+# Check if the source file exists
+if (Test-Path $sourcePath) {
+   
+    Copy-Item -Path $sourcePath -Destination $destinationPath -Force
+    Write-Host "File app.env has been copied to C:\authnull-db-agent successfully." -ForegroundColor Green
+} else {
+    # If the file doesn't exist, stop the script
+    Write-Host "File app.env not found in the current working directory. The script cannot proceed." -ForegroundColor Red
+    exit
+}
+ 
+#---------------------------------------------------------------------------
+# Function to read a password with completely hidden input
+function Read-Password {
+    $password = ""
+    while ($true) {
+        $key = [System.Console]::ReadKey($true)
+        if ($key.Key -eq "Enter") {
+            break
+        } elseif ($key.Key -eq "Backspace") {
+            if ($password.Length -gt 0) {
+                $password = $password.Substring(0, $password.Length - 1)
+            }
+        } else {
+            $password += $key.KeyChar
+        }
+    }
+    return $password
+}
+
+# Prompt the user for runtime inputs
+$DbHost = Read-Host "Enter the database host IP"
+$DbUserName = Read-Host "Enter the user name"
+
+# Use the custom Read-Password function to hide the password input
+Write-Host "Enter the database password:" -NoNewline
+$DbPassword = Read-Password 
+
+Write-Host ""
+$ApiKey = Read-Host "Enter the API key"
+
+# Hardcode the mode as 'service'
+$mode = "service"
+
+# Escape the password for command-line compatibility
+$EscapedPassword = "`"$DbPassword`""
+
+# Command to run the Go agent
+$command = "C:\authnull-db-agent\agent.exe --host `"$DbHost`" --username `"$DbUserName`" --password `"$EscapedPassword`" --apikey `"$ApiKey`" --mode `"$mode`""
+
+# Output the command for debugging 
+Write-Host "Command: $command"
+
+# run the command
+Invoke-Expression $command
