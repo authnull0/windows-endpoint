@@ -80,10 +80,10 @@ $destinationPath = $OutputPath + "\db.env"
 if (Test-Path $sourcePath) {
    
     Copy-Item -Path $sourcePath -Destination $destinationPath -Force
-    Write-Host "File app.env has been copied to C:\authnull-db-agent successfully." -ForegroundColor Green
+    Write-Host "File db.env has been copied to C:\authnull-db-agent successfully." -ForegroundColor Green
 } else {
     # If the file doesn't exist, stop the script
-    Write-Host "File app.env not found in the current working directory. The script cannot proceed." -ForegroundColor Red
+    Write-Host "File db.env not found in the current working directory. The script cannot proceed." -ForegroundColor Red
     exit
 }
 #--------------------------------------------------------------------
@@ -132,7 +132,7 @@ $EscapedPassword = "`"$DbPassword`""
 $command = "C:\authnull-db-agent\windows-mysql-db-agent.exe --host `"$DbHost`" --username `"$DbUserName`" --password `"$EscapedPassword`" --apikey `"$ApiKey`" --mode `"$mode`""
 
 # Output the command for debugging 
-Write-Host "Command: $command"
+#Write-Host "Command: $command"
 
 # run the command
 Invoke-Expression $command
