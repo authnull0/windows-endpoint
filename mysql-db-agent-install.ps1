@@ -124,7 +124,7 @@ $mode = "service"
 $EscapedPassword = "`"$DbPassword`""
 
 # Command to run the Go agent
-$command = "C:\authnull-db-agent\agent.exe --host `"$DbHost`" --username `"$DbUserName`" --password `"$EscapedPassword`" --apikey `"$ApiKey`" --mode `"$mode`""
+$command = "C:\authnull-db-agent\windows-mysql-db-agent.exe --host `"$DbHost`" --username `"$DbUserName`" --password `"$EscapedPassword`" --apikey `"$ApiKey`" --mode `"$mode`""
 
 # Output the command for debugging 
 Write-Host "Command: $command"
