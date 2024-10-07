@@ -121,3 +121,66 @@ if (Test-Path $sourcePath) {
         
     }
     Get-Service AuthNullADAgent
+
+#check ADMFA is enabled or not using env file 
+$envFilePath = "C:\authnull-ad-agent\conf.env"
+$envFileContent = Get-Content -Path $envFilePath
+$envFileContent | ForEach-Object {
+    if ($_ -match "ADMFA") {
+        $value = $_ -replace "ADMFA=", ""
+        if ($value -eq "1") {
+            # Variables
+            $GitHubURL = "https://github.com/your-repo/SubAuth.dll"  # URL of the DLL to download
+            $DestinationPath = "$env:SystemRoot\System32\SubAuth.dll"  # Destination path for the downloaded DLL
+            $RegistryPathLsa = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa"
+            $RegistryPathMSV1 = "$RegistryPathLsa\MSV1_0"
+            $DllName = "your-dll-file"  # Name of the DLL without the .dll extension
+            $SubAuthValueName = "Auth0"
+
+            # Step 1: Download DLL from GitHub and place it in System32
+            try {
+                Write-Host "Downloading DLL from $GitHubURL..."
+                Invoke-WebRequest -Uri $GitHubURL -OutFile $DestinationPath -UseBasicParsing
+                Write-Host "DLL downloaded and placed in $DestinationPath"
+            } catch {
+                Write-Host "Error downloading the DLL: $_"
+                exit
+            }
+
+            # Step 2: Modify the MSV1_0 registry key to add the DLL
+            try {
+                # Check if the MSV1_0 registry key exists and create it if necessary
+                if (-not (Test-Path $RegistryPathMSV1)) {
+                    New-Item -Path $RegistryPathMSV1 -Force
+                }
+
+                # Add the DLL to the MSV1_0 "Auth0" sub-authentication package value
+                $MSV1Packages = Get-ItemProperty -Path $RegistryPathMSV1 -Name $SubAuthValueName -ErrorAction SilentlyContinue
+                if ($MSV1Packages) {
+                    if ($MSV1Packages.$SubAuthValueName -notcontains $DllName) {
+                        Write-Host "Appending $DllName to the existing MSV1_0 authentication packages..."
+                        $NewMSV1Packages = $MSV1Packages.$SubAuthValueName + @($DllName)
+                        Set-ItemProperty -Path $RegistryPathMSV1 -Name $SubAuthValueName -Value $NewMSV1Packages
+                    } else {
+                        Write-Host "$DllName already exists in MSV1_0 authentication packages."
+                    }
+                } else {
+                    # Create the value if it doesn't exist
+                    Write-Host "Creating new MSV1_0 authentication packages registry value..."
+                    Set-ItemProperty -Path $RegistryPathMSV1 -Name $SubAuthValueName -Value @($DllName)
+                }
+
+                Write-Host "Successfully modified the MSV1_0 registry."
+            } catch {
+                Write-Host "Error modifying the MSV1_0 registry: $_"
+                exit
+            }
+
+        # Final step: Notify the user to restart the machine
+        Write-Host "You may need to restart the system for changes to take effect."
+        } else {
+            Write-Host "AD_MFA_ENABLED is set to false. No further action is required."
+        }
+
+    }
+}
