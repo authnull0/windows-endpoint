@@ -110,7 +110,7 @@ try {
 Get-Service AuthNullADAgent
 
 # Check ADMFA is enabled or not using env file 
-$envFileContent = Get-Content -Path $envFilePath
+$envFileContent = Get-Content -Path $destinationPath
 $envFileContent | ForEach-Object {
     if ($_ -match "ADMFA") {
         $value = $_ -replace "ADMFA=", ""
