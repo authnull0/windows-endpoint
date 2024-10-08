@@ -157,7 +157,7 @@ foreach ($line in $envContent) {
     }
 }
 
-if ($envDict["ADMFA"] -eq "True") {
+if ($envDict["ADMFA"] -eq "1") {
     # Domain join logic here...
     Write-Host "ADMFA flag is set. Proceeding with domain join." -ForegroundColor Green
     #get details from env file

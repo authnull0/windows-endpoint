@@ -1,4 +1,25 @@
-#single file
+# Get the password securely from the user as the first step
+$cred = Get-Credential
+
+# Convert the password to a secure string and save it in the environment file
+$envFilePath = "C:\authnull-ad-agent\conf.env"
+$securePassword = $cred.Password | ConvertFrom-SecureString
+if (-not (Test-Path -Path $envFilePath)) {
+    try {
+        New-Item -Path $envFilePath -ItemType File -Force | Out-Null
+        Write-Host "Created conf.env file: $envFilePath" -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to create conf.env file: $_" -ForegroundColor Red
+        exit
+    }
+}
+
+Add-Content -Path $envFilePath -Value "`nPassword=$securePassword"
+Write-Host "Password stored successfully in the env file." -ForegroundColor Green
+
+
+# Continue with the rest of the script
+
 param (
     [string]$OutputPath
 )
@@ -20,14 +41,12 @@ if (-not (Test-Path -Path $OutputPath -PathType Container)) {
     }
 } else {
     Write-Host "Output directory already exists...downloading now" -ForegroundColor Yellow
-    
 }
 
 # Define the URL of the file to download
 $url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/ad-agent.zip"
 
 # Download the file
-
 try {
     $webClient = New-Object System.Net.WebClient
     $webClient.DownloadFile($url, "$OutputPath\ad-agent.zip")
@@ -38,19 +57,18 @@ try {
 }
 
 if (Test-Path "$OutputPath\ad-agent.zip") {
-# Extract the file
-try {
-    Expand-Archive -Path "$OutputPath\ad-agent.zip" -DestinationPath $OutputPath -Force
-    Write-Host "Extraction completed successfully." -ForegroundColor Green
-} catch {
-    Write-Host "Extraction failed: $_" -ForegroundColor Red
-}
-}
-else {
+    # Extract the file
+    try {
+        Expand-Archive -Path "$OutputPath\ad-agent.zip" -DestinationPath $OutputPath -Force
+        Write-Host "Extraction completed successfully." -ForegroundColor Green
+    } catch {
+        Write-Host "Extraction failed: $_" -ForegroundColor Red
+    }
+} else {
     Write-Host "Zip file not found at: $OutputPath\ad-agent.zip" -ForegroundColor Red
 }
 
-#create folder C:\authnull-ad-agent
+# Create folder C:\authnull-ad-agent
 $FolderPath = "C:\authnull-ad-agent"
 if (-not (Test-Path -Path $FolderPath -PathType Container)) {
     try {
@@ -62,47 +80,19 @@ if (-not (Test-Path -Path $FolderPath -PathType Container)) {
     }
 } else {
     Write-Host "Folder already exists.." -ForegroundColor Yellow
-    
 }
 
-#copy publish folder
+# Copy publish folder
 $sourceDirectory = $OutputPath + "\windows-endpoint-ad-agent\agent\ad-agent-build"
 Copy-Item -Path "$sourceDirectory\*" -Destination $FolderPath -Recurse -Force -Verbose
 Write-Host "Copied files successfully to the publish folder.." -ForegroundColor Green
 
-# # Prompt the user for input
-# Write-Host "Please copy and paste the content for the conf file. Press Enter twice to finish." -ForegroundColor DarkGreen
-
-# #Getting the conf file content
-# $confContent = ""
-# do {
-#     $line = Read-Host
-#     if (-not [string]::IsNullOrEmpty($line)) {
-#         $confContent += "$line`n" # Append the line to the text blob
-#     }
-# } while (-not [string]::IsNullOrEmpty($line))
-
-
-# # Write the conf file with the provided content
-# try {
-
-#     #check whether the file is empty or not
-#     if (-not [string]::IsNullOrEmpty($confContent)) {
-#         $confContent | Out-File -FilePath $confFilePath -Encoding utf8
-#         Write-Host "Configuration file saved successfully to: $confFilePath" -ForegroundColor Green
-#     } else {
-#         Write-Host "The content to be written to the file is null or empty." -ForegroundColor Yellow
-#     }
-# } catch {
-#     Write-Host "Failed to save configuration file: $_" -ForegroundColor Red
-# }
-
+# Copy the configuration file
 $sourcePath = (Get-Location).Path + "\agent.conf"
 $destinationPath = "C:\authnull-ad-agent\agent.conf"
 
 # Check if the source file exists
 if (Test-Path $sourcePath) {
-   
     Copy-Item -Path $sourcePath -Destination $destinationPath -Force
     Write-Host "File agent.conf has been copied to C:\authnull-ad-agent successfully." -ForegroundColor Green
 } else {
@@ -110,20 +100,18 @@ if (Test-Path $sourcePath) {
     Write-Host "File not found in the current working directory. The script cannot proceed." -ForegroundColor Red
     exit
 }
-#start service
-    try{
-        New-Service -Name "AuthNullADAgent" -BinaryPathName "C:\authnull-ad-agent\publish\ADagent.exe" 
 
-        Start-Service -Name "AuthNullADAgent" -WarningAction SilentlyContinue
-    }
-    catch{
-        Write-Host "Failed to start service" -ForegroundColor Red
-        
-    }
-    Get-Service AuthNullADAgent
+# Start service
+try {
+    New-Service -Name "AuthNullADAgent" -BinaryPathName "C:\authnull-ad-agent\publish\ADagent.exe"
+    Start-Service -Name "AuthNullADAgent" -WarningAction SilentlyContinue
+} catch {
+    Write-Host "Failed to start service" -ForegroundColor Red
+}
 
-#check ADMFA is enabled or not using env file 
-$envFilePath = "C:\authnull-ad-agent\conf.env"
+Get-Service AuthNullADAgent
+
+# Check ADMFA is enabled or not using env file 
 $envFileContent = Get-Content -Path $envFilePath
 $envFileContent | ForEach-Object {
     if ($_ -match "ADMFA") {
@@ -134,7 +122,7 @@ $envFileContent | ForEach-Object {
             $DestinationPath = "$env:SystemRoot\System32\SubAuth.dll"  # Destination path for the downloaded DLL
             $RegistryPathLsa = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa"
             $RegistryPathMSV1 = "$RegistryPathLsa\MSV1_0"
-            $DllName = "your-dll-file"  # Name of the DLL without the .dll extension
+            $DllName = "SubAuth.dll"
             $SubAuthValueName = "Auth0"
 
             # Step 1: Download DLL from GitHub and place it in System32
@@ -176,11 +164,10 @@ $envFileContent | ForEach-Object {
                 exit
             }
 
-        # Final step: Notify the user to restart the machine
-        Write-Host "You may need to restart the system for changes to take effect."
+            # Final step: Notify the user to restart the machine
+            Write-Host "You may need to restart the system for changes to take effect."
         } else {
             Write-Host "AD_MFA_ENABLED is set to false. No further action is required."
         }
-
     }
 }
