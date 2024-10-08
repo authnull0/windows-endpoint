@@ -273,10 +273,15 @@ if ($envDict["ADMFA"] -eq "1") {
         $groups = $envDict["Groups"]
         $groups = $groups -split ","
         foreach ($group in $groups) {
+            $group = $group.Trim()  # Trim any leading or trailing whitespace
             $RemoteDesktopGroup = [ADSI]"WinNT://./Remote Desktop Users,group"
-            $DomainAdminsGroup = [ADSI]"WinNT://$DomainName/$group,group"
-            $RemoteDesktopGroup.Add($DomainAdminsGroup.Path)
-            Write-Host "Successfully added '$group' to the 'Remote Desktop Users' group."
+            $DomainGroupPath = "WinNT://$DomainName/$group,group"
+            try {
+                $RemoteDesktopGroup.Add($DomainGroupPath)
+                Write-Host "Successfully added '$group' to the 'Remote Desktop Users' group." -ForegroundColor Green
+            } catch {
+                Write-Host "Failed to add '$group' to the 'Remote Desktop Users' group. Error: $_" -ForegroundColor Red
+            }
         }
 
     } catch {
