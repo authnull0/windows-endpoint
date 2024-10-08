@@ -1,23 +1,3 @@
-# Get the password securely from the user as the first step
-$cred = Get-Credential
-
-# Convert the password to a secure string and save it in the environment file
-$envFilePath = "C:\authnull-ad-agent\conf.env"
-$securePassword = $cred.Password | ConvertFrom-SecureString
-if (-not (Test-Path -Path $envFilePath)) {
-    try {
-        New-Item -Path $envFilePath -ItemType File -Force | Out-Null
-        Write-Host "Created conf.env file: $envFilePath" -ForegroundColor Green
-    } catch {
-        Write-Host "Failed to create conf.env file: $_" -ForegroundColor Red
-        exit
-    }
-}
-
-Add-Content -Path $envFilePath -Value "`nPassword=$securePassword"
-Write-Host "Password stored successfully in the env file." -ForegroundColor Green
-
-
 # Continue with the rest of the script
 
 param (
@@ -100,6 +80,24 @@ if (Test-Path $sourcePath) {
     Write-Host "File not found in the current working directory. The script cannot proceed." -ForegroundColor Red
     exit
 }
+
+# Get the password securely from the user as the first step
+$cred = Get-Credential
+
+# Convert the password to a secure string and save it in the environment file
+$securePassword = $cred.Password | ConvertFrom-SecureString
+if (-not (Test-Path -Path $destinationPath)) {
+    try {
+        New-Item -Path $destinationPath -ItemType File -Force | Out-Null
+        Write-Host "Created conf.env file: $destinationPath" -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to create conf.env file: $_" -ForegroundColor Red
+        exit
+    }
+}
+
+Add-Content -Path $destinationPath -Value "PASSWORD=$securePassword"
+Write-Host "Password stored successfully in the env file." -ForegroundColor Green
 
 # Start service
 try {
