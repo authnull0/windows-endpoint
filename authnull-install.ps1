@@ -1,4 +1,4 @@
-
+#single file
 param (
     [string]$OutputPath
 )
@@ -8,141 +8,185 @@ if (-not $OutputPath) {
     Write-Host "Please provide the path where you want to save the downloaded file using the -OutputPath parameter." -ForegroundColor Yellow
     exit
 }
-
 #-----------------------------------------------------------------------
-# Cleaning the System
+#Cleaning the System 
+# Check if the output directory exists; if not, create it
 if (Test-Path -Path $OutputPath -PathType Container) {
     try {
-        Write-Host "Directory already exists. Deleting and recreating it..." -ForegroundColor Red
-        Remove-Item -Path $OutputPath -Recurse -Force
+        Write-Host "Directory already exist. Deleting and recreating it.." -ForegroundColor Red
+        Remove-Item -Path $OutputPath -Recurse -Force -ErrorAction SilentlyContinue
+        
     } catch {
         Write-Host "Failed to delete directory: $_" -ForegroundColor Red
         exit
     }
+
+    try{
+        Write-Host "Creating a new directory.." -ForegroundColor Yellow
+        New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
+        Write-Host "Created directory: $OutputPath" -ForegroundColor Green   
+}
+catch{
+    Write-Host "Failed to create directory: $_ " -ForegroundColor Red
+
 }
 
-try {
-    Write-Host "Creating a new directory..." -ForegroundColor Yellow
-    New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
-    Write-Host "Created directory: $OutputPath" -ForegroundColor Green
-} catch {
-    Write-Host "Failed to create directory: $_" -ForegroundColor Red
-    exit
-}
-
-#-----------------------------------------------------------------------
-# Uninstalling pGina if installed
-$uninstallPath = "C:\Program Files\pGina\unins000.exe"
-
-if (Test-Path $uninstallPath) {
-    try {
-        Write-Host "Uninstalling previously configured pGina" -ForegroundColor Yellow
-        Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -Wait
-        Write-Host "pGina uninstalled successfully." -ForegroundColor Green
-    } catch {
-        Write-Host "Uninstalling pGina failed: $_" -ForegroundColor Red
     }
-} else {
-    Write-Host "Uninstaller not found at $uninstallPath." -ForegroundColor Red
+
+ else {
+    try{
+        Write-Host "Creating a new directory.." -ForegroundColor Yellow
+        New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
+        Write-Host "Created directory: $OutputPath" -ForegroundColor Green   
+}
+catch{
+    Write-Host "Failed to create directory: $_ " -ForegroundColor Red
+}
 }
 
-# Removing pGina folder and DLL files
-$pginaPath = "C:\Program Files\pGina"
-$files = @("C:\Windows\System32\golib.dll", "C:\Windows\System32\pGinaGINA.dll")
-
-if (Test-Path $pginaPath) {
-    try {
-        Remove-Item -Path $pginaPath -Force -Recurse -ErrorAction SilentlyContinue
-        Write-Host "pGina folder removed successfully..." -ForegroundColor Green
-    } catch {
-        Write-Host "pGina folder cannot be deleted: $_" -ForegroundColor Red
-    }
-}
-
-foreach ($file in $files) {
-    if (Test-Path $file) {
-        try {
-            Remove-Item -Path $file -Force
-            Write-Host "Deleted $file successfully." -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to delete $file: $_" -ForegroundColor Red
-        }
-    } else {
-        Write-Host "$file does not exist" -ForegroundColor Yellow
-    }
-}
-
-#-----------------------------------------------------------------------
-# Deleting pGina registry keys
-$keyPath = "HKLM:\SOFTWARE\pGina3"
-if (Test-Path $keyPath) {
-    try {
-        Remove-Item -Path $keyPath -Recurse -Force
-        Write-Host "Registry keys and values deleted successfully." -ForegroundColor Green
-    } catch {
-        Write-Host "Failed to delete pGina registry keys: $_" -ForegroundColor Red
-    }
-} else {
-    Write-Host "Registry key '$keyPath' not found." -ForegroundColor Yellow
-}
-
-#-----------------------------------------------------------------------
-# Download and extract file from URL
+#-------------------------------------------------------------------------------------
+# Define the URL of the file to download
 $url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/main.zip"
-$zipFilePath = "$OutputPath\file.zip"
+$outputFile = Join-Path -Path $OutputPath -ChildPath "file.zip"
+
+# Create a WebClient object
+$webClient = New-Object System.Net.WebClient
 
 try {
-    $webClient = New-Object System.Net.WebClient
-    $webClient.DownloadFile($url, $zipFilePath)
+    Write-Host "Starting download from $url..." -ForegroundColor Cyan
+    $webClient.DownloadFile($url, $outputFile)
     Write-Host "Download completed successfully." -ForegroundColor Green
 } catch {
     Write-Host "Download failed: $_" -ForegroundColor Red
+    Write-Host "Exception details: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Stack trace: $($_.Exception.StackTrace)" -ForegroundColor Red
     exit
+} finally {
+    # Dispose of the WebClient object
+    $webClient.Dispose()
+}
+if (Test-Path "$OutputPath\file.zip") {
+# Extract the file
+try {
+    Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
+    Write-Host "Extraction completed successfully." -ForegroundColor Green
+} catch {
+    Write-Host "Extraction failed: $_" -ForegroundColor Red
+}
+}
+else {
+    Write-Host "Zip file not found at: $OutputPath\file.zip" -ForegroundColor Red
+
 }
 
-if (Test-Path $zipFilePath) {
-    try {
-        Expand-Archive -Path $zipFilePath -DestinationPath $OutputPath -Force
-        Write-Host "Extraction completed successfully." -ForegroundColor Green
-    } catch {
-        Write-Host "Extraction failed: $_" -ForegroundColor Red
-    }
-} else {
-    Write-Host "Zip file not found at: $zipFilePath" -ForegroundColor Red
-}
+#---------------------------------------------------------------------------------
+# Define the path where the environment file should be saved
+# if (-not (Test-Path -Path "C:\authnull-agent\app.env" -PathType Leaf)) {
+#     try {
+#         New-Item -Path "C:\authnull-agent\app.env" -ItemType File -Force | Out-Null
+#         Write-Host "Created file: C:\authnull-agent\app.env" -ForegroundColor Green
+#     } catch {
+#         Write-Host "Failed to create app.env: $_" -ForegroundColor Red
+#         exit
+#     }
+# }
 
-#-----------------------------------------------------------------------
-# Copy app.env to the destination
+# Define the source path in the current working directory
 $sourcePath = (Get-Location).Path + "\app.env"
 $destinationPath = "C:\authnull-agent\app.env"
 
+# Check if the source file exists
 if (Test-Path $sourcePath) {
-    try {
-        Copy-Item -Path $sourcePath -Destination $destinationPath -Force
-        Write-Host "app.env copied to C:\authnull-agent successfully." -ForegroundColor Green
-    } catch {
-        Write-Host "Failed to copy app.env: $_" -ForegroundColor Red
-    }
+   
+    Copy-Item -Path $sourcePath -Destination $destinationPath -Force
+    Write-Host "File app.env has been copied to C:\authnull-agent successfully." -ForegroundColor Green
 } else {
-    Write-Host "File app.env not found in the current directory. Exiting." -ForegroundColor Red
+    # If the file doesn't exist, stop the script
+    Write-Host "File app.env not found in the current working directory. The script cannot proceed." -ForegroundColor Red
     exit
 }
+# $envCount=0
+# $blank="_"
+# Write-Host "Please enter the content for the text file. Press Enter on a blank line to finish. Ensure the first line is not blank."
+# $envContent = ""
+# do {
+#     $line = Read-Host
+#     if (-not [string]::IsNullOrEmpty($line)) {
+#         $envContent += "$line`n" # Append the line to the text blob
+#     } else {
+#             $envCount=$envCount+1
+#             if ($envCount -gt 1) { 
+#                 $blank=""
+#             }
+#     }
+# } while (-not [string]::IsNullOrEmpty($blank))
 
-#-----------------------------------------------------------------------
-# Extracting and registering the agent service
-$agentPath = "$OutputPath\windows-endpoint-main\agent\windows-build\windows-agent-amd64.exe"
-if (Test-Path $agentPath) {
-    try{
-        Copy-Item -Path $agentPath -Destination $OutputPath -Force
-        New-Service -Name "AuthNullAgent" -BinaryPathName "$OutputPath\windows-agent-amd64.exe"
-        Start-Service "AuthNullAgent"
-        Write-Host "AuthNullAgent service started successfully." -ForegroundColor Green
-    } catch {
-        Write-Host "Failed to register/start AuthNullAgent: $_" -ForegroundColor Red
+# # Define the path for the text file
+# $agentFile = "C:\authnull-agent\app.env"
+
+# # Write the text blob to the text file
+# try {
+#    # $envContent | Out-File -FilePath $agentFile -Encoding utf8
+#     if (-not [string]::IsNullOrEmpty($envContent)) {
+#         $envContent | Out-File -FilePath $agentFile -Encoding utf8
+#         Write-Host "Config saved successfully to: $agentFile" -ForegroundColor Green
+#     } else {
+#         Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+#     }
+# } catch {
+#     Write-Host "Failed to save Config: $_" -ForegroundColor Red
+# }
+# # Create or overwrite the environment file with the provided content
+# try {
+   
+#     if (-not [string]::IsNullOrEmpty($envContent)) {
+#         $envContent | Out-File -FilePath $envFilePath -Encoding utf8
+#         Write-Host "Config saved successfully to: $envFilePath" -ForegroundColor Green
+#     } else {
+#         Write-Host "The content to be written to the file is null or empty" -ForegroundColor Yellow
+#     }
+# } catch {
+#     Write-Host "Failed to save Config: $_" -ForegroundColor Red
+# }
+ 
+#---------------------------------------------------------------------------
+Write-Host "Extracting agent" -ForegroundColor Yellow
+
+$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build.zip"
+
+if (Test-Path $AgentPath) {
+    # Extract the file
+        try {
+            Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
+            Write-Host "Extraction completed successfully." -ForegroundColor Green
+        } catch {
+            Write-Host "Extraction failed: $_" -ForegroundColor Red
+        }
+    } 
+    else {
+        Write-Host "Zip file not found at: $zipFilePath" -ForegroundColor Red
     }
-} else {
-    Write-Host "Agent not found at: $agentPath" -ForegroundColor Red
+
+#reusing agent path
+$AgentPath= $OutputPath + "\windows-endpoint-main\agent\windows-build\windows-agent-amd64.exe"
+Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
+
+
+try {
+    New-Service -Name "AuthNullAgent" -BinaryPathName $OutputPath"\windows-agent-amd64.exe" 
+    Start-Service AuthNullAgent -WarningAction SilentlyContinue
+} catch {
+    Write-Host "Registering AuthNull Agent failed!" -ForegroundColor Red
 }
+finally {
+    # Do this after the try block regardless of whether an exception occurred or not
+}
+Get-Service AuthNullAgent
+Write-Host "The path of the agent is " $OutputPath"\windows-agent-amd64.exe" -ForegroundColor Yellow
+
+
+#-------------------------------------------------------------------------------------
+
 
 #-----------------------------------------------------------------------
 # Check ADMFA flag in app.env and proceed with domain join or pGina install
@@ -156,7 +200,15 @@ foreach ($line in $envContent) {
         $envDict[$key.Trim()] = $value.Trim()
     }
 }
-
+# Check if ADMFA key exists and print its value
+if ($envDict.ContainsKey("ADMFA")) {
+    Write-Host "ADMFA flag value: $($envDict["ADMFA"])"
+} else {
+    Write-Host "ADMFA flag not found in app.env" -ForegroundColor Red
+    exit
+}
+#print ADMFA flag value
+Write-Host "ADMFA flag value: $($envDict["ADMFA"])" -ForegroundColor Yellow
 if ($envDict["ADMFA"] -eq "1") {
     # Domain join logic here...
     Write-Host "ADMFA flag is set. Proceeding with domain join." -ForegroundColor Green
@@ -230,10 +282,88 @@ if ($envDict["ADMFA"] -eq "1") {
     } catch {
         Write-Host "Failed to add 'Domain Admins' to the 'Remote Desktop Users' group. Error: $_"
     }
+}else {
+
+
+
+# Check if pGina already installed
+$uninstallPath = "C:\Program Files\pGina\unins000.exe"
+
+# Check if the uninstaller executable exists
+if (Test-Path $uninstallPath -PathType Leaf) {
+    try{
+    # Start the uninstaller process
+    Write-Host "Uninstalling previously configured pGina" -ForegroundColor Yellow
+    Start-Process -FilePath $uninstallPath -ArgumentList "/SILENT" -Wait
+    Write-Host "pGina uninstalled successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "Uninstalling Pgina Failed: $_" -ForegroundColor Red
+}
 } else {
-    # pGina installation logic here...
-    Write-Host "ADMFA flag not set. Proceeding with pGina installation." -ForegroundColor Green
-    #Installing pGina
+    Write-Host "Uninstaller not found at $uninstallPath." -ForegroundColor Red
+}
+
+$pginaPath = "C:\Program Files\pGina"
+
+if(Test-Path $pginaPath)
+{
+    try{
+        Remove-Item -Path $pginaPath -Force -Recurse -WarningAction SilentlyContinue
+        Write-Host "Pgina folder in C Drive removed sucessfully..." -ForegroundColor Green
+    }
+    catch{
+        Write-Host "Pgina folder cannot be deleted: $_" -ForegroundColor Red 
+    }
+}
+
+#Deleting dlls
+$files = @("C:\Windows\System32\golib.dll", "C:\Windows\System32\pGinaGINA.dll")
+
+foreach ($file in $files) {
+    if (Test-Path -Path $file) {
+        try {
+            Remove-Item -Path $file -Force
+            Write-Host "Deleted $file successfully.." -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to delete $file" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "$file does not exist" -ForegroundColor Yellow
+    }
+}
+
+
+#Deleting the pGina3 registry key values
+$keyPath = "HKLM:\Software\pGina3"
+
+# Check if the registry key exists
+if (Test-Path -Path $keyPath) {
+$RegistryKeyPath = "HKLM:\SOFTWARE\pGina3"
+# Check if the registry key exists
+if (Test-Path -Path $RegistryKeyPath) {
+    try{
+    # Remove the registry key and all its subkeys and values
+    Remove-Item -Path $RegistryKeyPath -Recurse -Force
+    Write-Host "Registry keys and values deleted successfully." -ForegroundColor Green
+    }
+
+    catch{
+        Write-Host "Failed to delete pgina registry keys and values: $_" -ForegroundColor Red
+    }
+
+} 
+else {
+    Write-Host "Registry key does not exist." -ForegroundColor Yellow
+}
+
+    } 
+else {
+    Write-Host "Registry key '$keyPath' not found." -ForegroundColor Yellow
+}
+
+
+#Installing pGina
 $InstallerPath= $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 
 if (-not $InstallerPath) {
@@ -490,5 +620,3 @@ catch{
     Write-Host "Restarting computer failed: $_" -ForegroundColor Red
 }
 }
-
-# Further code for LDAP, machine config, registry imports, etc.
