@@ -84,8 +84,10 @@ if (Test-Path $sourcePath) {
 # Get the password securely from the user as the first step
 $cred = Get-Credential
 
-# Convert the password to a secure string and save it in the environment file
-$securePassword = $cred.Password | ConvertFrom-SecureString
+# get the password as it is and store in the file as LDAP_PASSWORD
+$securePassword = $cred.GetNetworkCredential().Password
+
+
 if (-not (Test-Path -Path $destinationPath)) {
     try {
         New-Item -Path $destinationPath -ItemType File -Force | Out-Null
@@ -96,7 +98,7 @@ if (-not (Test-Path -Path $destinationPath)) {
     }
 }
 
-Add-Content -Path $destinationPath -Value "PASSWORD=$securePassword"
+Add-Content -Path $destinationPath -Value "LDAP_PASSWORD=$securePassword"
 Write-Host "Password stored successfully in the env file." -ForegroundColor Green
 
 # Start service
