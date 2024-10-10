@@ -114,7 +114,6 @@ Get-Service AuthNullADAgent
 # Check ADMFA is enabled or not using env file 
 $envFileContent = Get-Content -Path $destinationPath
 
-
 # Check if the env file exists
 if (-not (Test-Path -Path $envFilePath)) {
     Write-Host "The env file does not exist at path: $envFilePath" -ForegroundColor Red
@@ -139,9 +138,9 @@ $envFileContent | ForEach-Object {
             $GitHubURL = "https://raw.githubusercontent.com/authnull0/windows-endpoint/ad-agent/SubAuth.dll"  # Corrected URL of the DLL to download
             $DestinationPath = "$env:SystemRoot\System32\SubAuth.dll"  # Destination path for the downloaded DLL
             $RegistryPathLsa = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa"
-            $RegistryPathMSV1 = "$RegistryPathLsa\MSV1_0"
+            $RegistryPathKerberos = "$RegistryPathLsa\Kerberos"
             $DllName = "SubAuth"
-            $SubAuthValueName = "Auth0"
+            $SubAuthValueName = "Auth0"  # The name of the sub-authentication package in Kerberos
 
             # Step 1: Download DLL from GitHub and place it in System32
             try {
@@ -153,35 +152,35 @@ $envFileContent | ForEach-Object {
                 exit
             }
 
-            # Step 2: Modify the MSV1_0 registry key to add the DLL
+            # Step 2: Modify the Kerberos registry key to add the DLL
             try {
-                # Check if the MSV1_0 registry key exists and create it if necessary
-                if (-not (Test-Path $RegistryPathMSV1)) {
-                    New-Item -Path $RegistryPathMSV1 -Force
+                # Check if the Kerberos registry key exists and create it if necessary
+                if (-not (Test-Path $RegistryPathKerberos)) {
+                    New-Item -Path $RegistryPathKerberos -Force
                 }
 
-                # Add the DLL to the MSV1_0 "Auth0" sub-authentication package value
-                $MSV1Packages = Get-ItemProperty -Path $RegistryPathMSV1 -Name $SubAuthValueName -ErrorAction SilentlyContinue
-                if ($MSV1Packages) {
-                    Write-Host "Current MSV1_0 packages: $($MSV1Packages.$SubAuthValueName)" -ForegroundColor Yellow
-                    if ($MSV1Packages.$SubAuthValueName -notcontains $DllName) {
-                        Write-Host "Appending $DllName to the existing MSV1_0 authentication packages..."
-                        $NewMSV1Packages = $MSV1Packages.$SubAuthValueName + "," + $DllName
-                        Set-ItemProperty -Path $RegistryPathMSV1 -Name $SubAuthValueName -Value $NewMSV1Packages
-                        Write-Host "New MSV1_0 packages: $NewMSV1Packages" -ForegroundColor Yellow
+                # Add the DLL to the Kerberos "Auth0" sub-authentication package value
+                $KerberosPackages = Get-ItemProperty -Path $RegistryPathKerberos -Name $SubAuthValueName -ErrorAction SilentlyContinue
+                if ($KerberosPackages) {
+                    Write-Host "Current Kerberos packages: $($KerberosPackages.$SubAuthValueName)" -ForegroundColor Yellow
+                    if ($KerberosPackages.$SubAuthValueName -notcontains $DllName) {
+                        Write-Host "Appending $DllName to the existing Kerberos authentication packages..."
+                        $NewKerberosPackages = $KerberosPackages.$SubAuthValueName + "," + $DllName
+                        Set-ItemProperty -Path $RegistryPathKerberos -Name $SubAuthValueName -Value $NewKerberosPackages
+                        Write-Host "New Kerberos packages: $NewKerberosPackages" -ForegroundColor Yellow
                     } else {
-                        Write-Host "$DllName already exists in MSV1_0 authentication packages."
+                        Write-Host "$DllName already exists in Kerberos authentication packages."
                     }
                 } else {
                     # Create the value if it doesn't exist
-                    Write-Host "Creating new MSV1_0 authentication packages registry value..."
-                    Set-ItemProperty -Path $RegistryPathMSV1 -Name $SubAuthValueName -Value $DllName
-                    Write-Host "New MSV1_0 packages: $DllName" -ForegroundColor Yellow
+                    Write-Host "Creating new Kerberos authentication packages registry value..."
+                    Set-ItemProperty -Path $RegistryPathKerberos -Name $SubAuthValueName -Value $DllName
+                    Write-Host "New Kerberos packages: $DllName" -ForegroundColor Yellow
                 }
 
-                Write-Host "Successfully modified the MSV1_0 registry."
+                Write-Host "Successfully modified the Kerberos registry."
             } catch {
-                Write-Host "Error modifying the MSV1_0 registry: $_" -ForegroundColor Red
+                Write-Host "Error modifying the Kerberos registry: $_" -ForegroundColor Red
                 exit
             }
 
