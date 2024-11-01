@@ -98,7 +98,8 @@ if (-not (Test-Path -Path $destinationPath)) {
     }
 }
 
-Add-Content -Path $destinationPath -Value "LDAP_PASSWORD=$securePassword"
+# Add-Content -Path $destinationPath -Value "LDAP_PASSWORD=$securePassword" add in the new line
+Add-Content -Path $destinationPath -Value "LDAP_PASSWORD=$securePassword" -NewLine
 Write-Host "Password stored successfully in the env file." -ForegroundColor Green
 
 # Start service
