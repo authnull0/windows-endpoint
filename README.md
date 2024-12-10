@@ -2,7 +2,7 @@ SSP - AGENT
 
 Step 1 : Download the installation script 
 
-curl -L -o ssp_agent https://github.com/authnull0/windows-endpoint/raw/refs/heads/ssp-agent/ssp-agent/ssp_agent/install_ssp_agent.sh 
+curl -L -o install_ssp_agent.sh https://github.com/authnull0/windows-endpoint/raw/refs/heads/ssp-agent/ssp-agent/install_ssp_agent.sh 
 
 
 Step 2 : Make the script executable 
