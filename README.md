@@ -11,7 +11,7 @@ chmod +x install_ssp_agent.sh
 
 Step 3 : Run the script 
 
-./install_ssp_agent.sh
+sudo ./install_ssp_agent.sh
 
 Step 4 : After the agent installation completed, check the status 
 
