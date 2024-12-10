@@ -1,9 +1,22 @@
-This folder contains
+SSP - AGENT 
 
-- credential_provider - holds pgina binaries
-- agent - holds windows agent binaries
-- credential_provider\plugins - holds plugins
-- dependencies - any other dependencies.
-- lgpo.exe - command line tool can import/export group policy
-- .pol - contains the respective group policies for user onboarding
-- .inf - contains the security settings which allows LDAP users to login
+Step 1 : Download the installation script 
+
+curl -L -o ssp_agent https://github.com/authnull0/windows-endpoint/raw/refs/heads/ssp-agent/ssp-agent/ssp_agent/install_ssp_agent.sh 
+
+
+Step 2 : Make the script executable 
+
+chmod +x install_ssp_agent.sh
+
+Step 3 : Run the script 
+
+./install_ssp_agent.sh
+
+Step 4 : After the agent installation completed, check the status 
+
+sudo systemctl status ssp_agent
+
+Step 5 : Check the agent logs
+
+sudo tail -f /var/log/ssp_agent.log
