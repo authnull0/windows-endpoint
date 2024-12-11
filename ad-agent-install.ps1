@@ -111,6 +111,20 @@ if (-not (Test-Path -Path $destinationPath)) {
 Add-Content -Path $destinationPath -Value "`nLDAP_PASSWORD=$securePassword" -Force
 Write-Host "Password stored successfully in the env file." -ForegroundColor Green
 
+#updating group policy to enable and disable respective credential providers
+
+$lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
+
+$infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
+    
+try {
+    Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
+    Write-Host "Security settings installed successfully." -ForegroundColor Green
+} 
+catch {
+    Write-Host "Security setting installation failed : $_" -ForegroundColor Red
+}
+
 # Start service
 try {
     New-Service -Name "AuthNullADAgent" -BinaryPathName "C:\authnull-ad-agent\publish\ADagent.exe"
@@ -209,19 +223,6 @@ $envFileContent | ForEach-Object {
     }
 }
 
-#updating group policy to enable and disable respective credential providers
-
-$lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
-
-$infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
-    
-try {
-    Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
-    Write-Host "Security settings installed successfully." -ForegroundColor Green
-} 
-catch {
-    Write-Host "Security setting installation failed : $_" -ForegroundColor Red
-}
 
 #Restart Computer
 
