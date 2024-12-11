@@ -211,9 +211,9 @@ $envFileContent | ForEach-Object {
 
 #updating group policy to enable and disable respective credential providers
 
-$lgpoPath = $OutputPath + "\windows-endpoint-main\gpo\LGPO.exe"
+$lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
 
-$infFilePath = $OutputPath + "\windows-endpoint-main\gpo\security.inf"
+$infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
     
 try {
     Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
@@ -233,4 +233,4 @@ try {
 catch {
     Write-Host "Restarting computer failed: $_" -ForegroundColor Red
 }
-}
+
