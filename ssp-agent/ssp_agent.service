@@ -1,0 +1,17 @@
+[Unit]
+Description=Monitor SSH Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/ssp_agent
+Restart=on-failure
+User=root
+Group=root
+WorkingDirectory=/usr/local/sbin
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=ssp_agent
+
+[Install]
+WantedBy=multi-user.target
