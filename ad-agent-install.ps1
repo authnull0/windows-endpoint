@@ -15,11 +15,13 @@ if (-not (Test-Path -Path $OutputPath -PathType Container)) {
     try {
         New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
         Write-Host "Created directory: $OutputPath" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "Failed to create directory: $_" -ForegroundColor Red
         exit
     }
-} else {
+}
+else {
     Write-Host "Output directory already exists...downloading now" -ForegroundColor Yellow
 }
 
@@ -31,7 +33,8 @@ try {
     $webClient = New-Object System.Net.WebClient
     $webClient.DownloadFile($url, "$OutputPath\ad-agent.zip")
     Write-Host "Download completed successfully." -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Host "Download failed: $_" -ForegroundColor Red
     exit
 }
@@ -41,10 +44,12 @@ if (Test-Path "$OutputPath\ad-agent.zip") {
     try {
         Expand-Archive -Path "$OutputPath\ad-agent.zip" -DestinationPath $OutputPath -Force
         Write-Host "Extraction completed successfully." -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "Extraction failed: $_" -ForegroundColor Red
     }
-} else {
+}
+else {
     Write-Host "Zip file not found at: $OutputPath\ad-agent.zip" -ForegroundColor Red
 }
 
@@ -54,11 +59,13 @@ if (-not (Test-Path -Path $FolderPath -PathType Container)) {
     try {
         New-Item -Path $FolderPath -ItemType Directory -Force | Out-Null
         Write-Host "Created directory: $FolderPath" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "Failed to create directory: $_" -ForegroundColor Red
         exit
     }
-} else {
+}
+else {
     Write-Host "Folder already exists.." -ForegroundColor Yellow
 }
 
@@ -75,7 +82,8 @@ $destinationPath = "C:\authnull-ad-agent\agent.conf"
 if (Test-Path $sourcePath) {
     Copy-Item -Path $sourcePath -Destination $destinationPath -Force
     Write-Host "File agent.conf has been copied to C:\authnull-ad-agent successfully." -ForegroundColor Green
-} else {
+}
+else {
     # If the file doesn't exist, stop the script
     Write-Host "File not found in the current working directory. The script cannot proceed." -ForegroundColor Red
     exit
@@ -92,21 +100,37 @@ if (-not (Test-Path -Path $destinationPath)) {
     try {
         New-Item -Path $destinationPath -ItemType File -Force | Out-Null
         Write-Host "Created conf.env file: $destinationPath" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "Failed to create conf.env file: $_" -ForegroundColor Red
         exit
     }
 }
 
 # Add-Content -Path $destinationPath -Value "LDAP_PASSWORD=$securePassword" add in the new line
-Add-Content -Path $destinationPath -Value "LDAP_PASSWORD=$securePassword" -NewLine
+Add-Content -Path $destinationPath -Value "`nLDAP_PASSWORD=$securePassword" -Force
 Write-Host "Password stored successfully in the env file." -ForegroundColor Green
+
+#updating group policy to enable and disable respective credential providers
+
+$lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
+
+$infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
+    
+try {
+    Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
+    Write-Host "Security settings installed successfully." -ForegroundColor Green
+} 
+catch {
+    Write-Host "Security setting installation failed : $_" -ForegroundColor Red
+}
 
 # Start service
 try {
     New-Service -Name "AuthNullADAgent" -BinaryPathName "C:\authnull-ad-agent\publish\ADagent.exe"
     Start-Service -Name "AuthNullADAgent" -WarningAction SilentlyContinue
-} catch {
+}
+catch {
     Write-Host "Failed to start service" -ForegroundColor Red
 }
 
@@ -116,16 +140,17 @@ Get-Service AuthNullADAgent
 $envFileContent = Get-Content -Path $destinationPath
 
 # Check if the env file exists
-if (-not (Test-Path -Path $envFilePath)) {
-    Write-Host "The env file does not exist at path: $envFilePath" -ForegroundColor Red
+if (-not (Test-Path -Path $destinationPath)) {
+    Write-Host "The env file does not exist at path: $destinationPath" -ForegroundColor Red
     exit
 }
 
 # Read the content of the env file
 try {
-    $envFileContent = Get-Content -Path $envFilePath
+    $envFileContent = Get-Content -Path $destinationPath
     Write-Host "Successfully read the env file." -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Host "Failed to read the env file: $_" -ForegroundColor Red
     exit
 }
@@ -148,7 +173,8 @@ $envFileContent | ForEach-Object {
                 Write-Host "Downloading DLL from $GitHubURL..."
                 Invoke-WebRequest -Uri $GitHubURL -OutFile $DestinationPath -UseBasicParsing
                 Write-Host "DLL downloaded and placed in $DestinationPath"
-            } catch {
+            }
+            catch {
                 Write-Host "Error downloading the DLL: $_" -ForegroundColor Red
                 exit
             }
@@ -169,10 +195,12 @@ $envFileContent | ForEach-Object {
                         $NewKerberosPackages = $KerberosPackages.$SubAuthValueName + "," + $DllName
                         Set-ItemProperty -Path $RegistryPathKerberos -Name $SubAuthValueName -Value $NewKerberosPackages
                         Write-Host "New Kerberos packages: $NewKerberosPackages" -ForegroundColor Yellow
-                    } else {
+                    }
+                    else {
                         Write-Host "$DllName already exists in Kerberos authentication packages."
                     }
-                } else {
+                }
+                else {
                     # Create the value if it doesn't exist
                     Write-Host "Creating new Kerberos authentication packages registry value..."
                     Set-ItemProperty -Path $RegistryPathKerberos -Name $SubAuthValueName -Value $DllName
@@ -180,15 +208,30 @@ $envFileContent | ForEach-Object {
                 }
 
                 Write-Host "Successfully modified the Kerberos registry."
-            } catch {
+            }
+            catch {
                 Write-Host "Error modifying the Kerberos registry: $_" -ForegroundColor Red
                 exit
             }
 
             # Final step: Notify the user to restart the machine
             Write-Host "You may need to restart the system for changes to take effect."
-        } else {
+        }
+        else {
             Write-Host "ADMFA is set to false. No further action is required."
         }
     }
 }
+
+
+#Restart Computer
+
+try {
+    Write-Host "Waiting for 10 seconds before restarting..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 10
+    Restart-Computer -Force
+}
+catch {
+    Write-Host "Restarting computer failed: $_" -ForegroundColor Red
+}
+
