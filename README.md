@@ -1,7 +1,3 @@
-CUSTOM-PAM-MODULE CONFIGURATION
+WINDOWS - AGENT
 
--contains updated did.sh, pam_custom_ldap_pwd.c of broadcom onboarded machines 
-
--contains pam_custom.so 
-
--agentv2 is the updated agent 
+-this folder contains windows agent and app.env file 
