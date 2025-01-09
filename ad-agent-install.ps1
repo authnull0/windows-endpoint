@@ -113,17 +113,17 @@ Write-Host "Password stored successfully in the env file." -ForegroundColor Gree
 
 #updating group policy to enable and disable respective credential providers
 
-$lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
+# $lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
 
-$infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
+# $infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
     
-try {
-    Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
-    Write-Host "Security settings installed successfully." -ForegroundColor Green
-} 
-catch {
-    Write-Host "Security setting installation failed : $_" -ForegroundColor Red
-}
+# try {
+#     Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
+#     Write-Host "Security settings installed successfully." -ForegroundColor Green
+# } 
+# catch {
+#     Write-Host "Security setting installation failed : $_" -ForegroundColor Red
+# }
 
 # Start service
 try {
