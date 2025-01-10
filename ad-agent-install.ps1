@@ -150,7 +150,7 @@ try {
     # Step 2: Modify the PasswordComplexity setting
     Write-Host "Modifying PasswordComplexity setting to 0..." -ForegroundColor Yellow
     $content = Get-Content $BackupFile
-    $content = $content -replace "PasswordComplexity\s*=\s*\d+", "PasswordComplexity = 1"
+    $content = $content -replace "PasswordComplexity\s*=\s*\d+", "PasswordComplexity = 0"
     $content | Set-Content $ModifiedFile
     Write-Host "PasswordComplexity updated in $ModifiedFile" -ForegroundColor Green
 
