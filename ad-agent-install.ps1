@@ -113,17 +113,22 @@ Write-Host "Password stored successfully in the env file." -ForegroundColor Gree
 
 #updating group policy to enable and disable respective credential providers
 
-# $lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
+$lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
 
-# $infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
+$infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
     
-# try {
-#     Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
-#     Write-Host "Security settings installed successfully." -ForegroundColor Green
-# } 
-# catch {
-#     Write-Host "Security setting installation failed : $_" -ForegroundColor Red
-# }
+try {
+    Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
+    Write-Host "Security settings installed successfully." -ForegroundColor Green
+
+    # Run gpupdate /force to refresh policies
+    Write-Host "Refreshing Group Policy settings..." -ForegroundColor Yellow
+    Start-Process -FilePath "gpupdate" -ArgumentList "/force" -Wait
+    Write-Host "Group Policy updated successfully." -ForegroundColor Green
+} 
+catch {
+    Write-Host "Security setting installation failed : $_" -ForegroundColor Red
+}
 
 # Start service
 try {
@@ -224,14 +229,14 @@ $envFileContent | ForEach-Object {
 }
 
 
-#Restart Computer
+# #Restart Computer
 
-try {
-    Write-Host "Waiting for 10 seconds before restarting..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 10
-    Restart-Computer -Force
-}
-catch {
-    Write-Host "Restarting computer failed: $_" -ForegroundColor Red
-}
+# try {
+#     Write-Host "Waiting for 10 seconds before restarting..." -ForegroundColor Yellow
+#     Start-Sleep -Seconds 10
+#     Restart-Computer -Force
+# }
+# catch {
+#     Write-Host "Restarting computer failed: $_" -ForegroundColor Red
+# }
 
