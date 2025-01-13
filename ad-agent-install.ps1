@@ -111,24 +111,67 @@ if (-not (Test-Path -Path $destinationPath)) {
 Add-Content -Path $destinationPath -Value "`nLDAP_PASSWORD=$securePassword" -Force
 Write-Host "Password stored successfully in the env file." -ForegroundColor Green
 
-#updating group policy to enable and disable respective credential providers
+# #updating group policy to enable and disable respective credential providers
 
-$lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
+# $lgpoPath = $OutputPath + "\windows-endpoint-ad-agent\gpo\LGPO.exe"
 
-$infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
+# $infFilePath = $OutputPath + "\windows-endpoint-ad-agent\gpo\security.inf"
     
-try {
-    Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
-    Write-Host "Security settings installed successfully." -ForegroundColor Green
+# try {
+#     Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
+#     Write-Host "Security settings installed successfully." -ForegroundColor Green
 
-    # Run gpupdate /force to refresh policies
-    Write-Host "Refreshing Group Policy settings..." -ForegroundColor Yellow
-    Start-Process -FilePath "gpupdate" -ArgumentList "/force" -Wait
-    Write-Host "Group Policy updated successfully." -ForegroundColor Green
-} 
-catch {
-    Write-Host "Security setting installation failed : $_" -ForegroundColor Red
+#     # Run gpupdate /force to refresh policies
+#     Write-Host "Refreshing Group Policy settings..." -ForegroundColor Yellow
+#     Start-Process -FilePath "gpupdate" -ArgumentList "/force" -Wait
+#     Write-Host "Group Policy updated successfully." -ForegroundColor Green
+# } 
+# catch {
+#     Write-Host "Security setting installation failed : $_" -ForegroundColor Red
+# }
+
+# Define paths
+$BackupDirectory = "C:\Backup\SecurityPolicies"
+$BackupFile = "$BackupDirectory\security.inf"
+$ModifiedFile = "$BackupDirectory\modified_security.inf"
+$LogFile = "$BackupDirectory\secedit.log"
+
+# Ensure the backup directory exists
+if (-not (Test-Path $BackupDirectory)) {
+    New-Item -ItemType Directory -Path $BackupDirectory -Force | Out-Null
 }
+
+try {
+    # Step 1: Export the current security policy
+    Write-Host "Exporting current security policy..." -ForegroundColor Yellow
+    secedit /export /cfg $BackupFile /log $LogFile
+    Write-Host "Exported security policy to $BackupFile" -ForegroundColor Green
+
+    # Step 2: Modify the PasswordComplexity setting
+    Write-Host "Modifying PasswordComplexity setting to 0..." -ForegroundColor Yellow
+    $content = Get-Content $BackupFile
+    $content = $content -replace "PasswordComplexity\s*=\s*\d+", "PasswordComplexity = 0"
+    $content | Set-Content $ModifiedFile
+    Write-Host "PasswordComplexity updated in $ModifiedFile" -ForegroundColor Green
+
+    # Step 3: Reimport the modified security policy
+    Write-Host "Importing modified security policy..." -ForegroundColor Yellow
+    $seceditPath = Join-Path $env:SystemRoot "security\local.sdb"
+    secedit /configure /db $seceditPath /cfg $ModifiedFile /log $LogFile
+    Write-Host "Modified security policy applied successfully." -ForegroundColor Green
+
+    # Step 4: Force Group Policy update
+    Write-Host "Forcing Group Policy update..." -ForegroundColor Yellow
+    gpupdate /force
+    Write-Host "Group Policy updated successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "An error occurred: $_" -ForegroundColor Red
+}
+
+# Check the log file for any issues
+Write-Host "Check the log file at $LogFile for detailed information." -ForegroundColor Yellow
+
 
 # Start service
 try {
