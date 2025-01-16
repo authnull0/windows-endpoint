@@ -1,3 +1,5 @@
+agentvm@Brcm-Linux-Agent:~$ cat vi /did.sh
+cat: vi: No such file or directory
 #!/bin/bash
 
 echo "Hello, Starting the Assertion"
@@ -80,5 +82,4 @@ else
 fi
 
 content=$(sed '$ d' <<< "$requestId")
-
-return 0
+echo "$RES"
