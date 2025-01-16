@@ -1,14 +1,27 @@
+
 #!/bin/bash
 
-echo "hello, Starting the Assertion"
+echo "Hello, Starting the Assertion"
 
 user=$1
 source_ip=$2
 
+# Load variables from app.env
+if [[ -f ./app.env ]]; then
+  export $(grep -v '^#' ./app.env | xargs)
+else
+  echo "Error: app.env file not found in the current working directory."
+  exit 1
+fi
+
+# Validate if ORG_ID and TENANT_ID are set
+if [[ -z "$ORG_ID" || -z "$TENANT_ID" ]]; then
+  echo "Error: ORG_ID or TENANT_ID not found in app.env."
+  exit 1
+fi
 
 echo "User: $user"
 echo "Source IP: $source_ip"
-
 
 string=$(groups $USER)
 prefix="$USER : "
@@ -44,8 +57,8 @@ generate_post_data() {
   "credentialType": "$credentialType",
   "hostname": "$(echo ${hoststr})",
   "groupName": "$(echo ${value})",
-  "orgId": 84,
-  "tenantId": 7,
+  "orgId": $ORG_ID,
+  "tenantId": $TENANT_ID,
   "requestId": "$(echo $uuid)",
   "sourceIp": "$(echo ${source_ip})"
 }
@@ -68,5 +81,4 @@ else
 fi
 
 content=$(sed '$ d' <<< "$requestId")
-
-return 0
+echo "$RES"
