@@ -21,8 +21,11 @@ app_env_content=${app_env_content%$'\n'}
 # Create the app.env file with the provided content
 echo -n "$app_env_content" > app.env
 
+#copy app.env to / directory
+sudo cp app.env /
+
 # Make the agent file executable
 sudo chmod +x agentv2
 
 # Run the agent
-./agentv2
+sudo ./agentv2
