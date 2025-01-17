@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Download Files
-#sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/pam_google_authenticator.so
+sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/pam_google_authenticator.so
 sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/did.sh
 sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/log_pam_rhost.sh
 
@@ -10,7 +10,7 @@ echo "Files downloaded. Check the logs with: tail -f /var/log/auth.log (Ubuntu) 
 
 # Move Files
 sudo mkdir -p /usr/local/lib/security
-#sudo mv /tmp/pam_google_authenticator.so /usr/local/lib/security
+sudo mv /tmp/pam_google_authenticator.so /usr/local/lib/security
 sudo mv /tmp/did.sh /
 sudo mv /tmp/log_pam_rhost.sh /usr/local/bin/
 sudo chmod +x /did.sh
