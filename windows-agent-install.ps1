@@ -497,7 +497,101 @@ else {
 
     # Define the replacement string
     $replacementString = "<runtime> <loadFromRemoteSources enabled=`"true`"/> </runtime>"
+# Function to read environment variables from app.env file
+function Get-EnvVariables {
+    param (
+        [string]$filePath
+    )
+    $envDict = @{}
+    $envContent = Get-Content -Path $filePath
+    foreach ($line in $envContent) {
+        if ($line -match "=") {
+            $key, $value = $line -split "=", 2
+            $envDict[$key.Trim()] = $value.Trim()
+        }
+    }
+    return $envDict
+}
 
+# Function to display a prompt for selecting AD groups
+function Select-ADGroups {
+    param (
+        [string]$ldapHost,
+        [string]$ldapPort,
+        [string]$searchDn,
+        [string]$username,
+        [string]$password
+    )
+
+    $ldapPath = "LDAP://$ldapHost:$ldapPort/$searchDn"
+    $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($ldapPath, $username, $password)
+    $directorySearcher = New-Object System.DirectoryServices.DirectorySearcher($directoryEntry)
+    $directorySearcher.Filter = "(objectClass=group)"
+    $directorySearcher.PageSize = 1000
+    $groups = $directorySearcher.FindAll() | ForEach-Object { $_.Properties["name"] } | Sort-Object
+
+    $selectedGroups = $groups | Out-GridView -Title "Select AD Groups" -PassThru
+    return $selectedGroups
+}
+
+# Read environment variables from app.env file
+$envFilePath = "C:\authnull-agent\app.env"
+$envDict = Get-EnvVariables -filePath $envFilePath
+
+# Get LDAP details from environment variables
+$ldapHost = $envDict["LDAP_HOST"]
+$ldapPort = $envDict["LDAP_PORT"]
+$searchDn = $envDict["SEARCH_DN"]
+
+# Prompt user to enter LDAP username and password
+$username = Read-Host "Enter LDAP username"
+$password = Read-Host "Enter LDAP password" -AsSecureString
+
+# Convert the secure string password to plain text for LDAP connection
+$ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
+$passwordPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+
+# Prompt user to select AD groups
+$selectedGroups = Select-ADGroups -ldapHost $ldapHost -ldapPort $ldapPort -searchDn $searchDn -username $username -password $passwordPlainText
+
+# Store selected groups in a file
+$selectedGroups | Out-File -FilePath "C:\selected_user_groups.conf"
+
+# Read selected groups from the file
+$groups = Get-Content -Path "C:\selected_user_groups.conf"
+
+# Retrieve the domain name
+$DomainName = (Get-WmiObject Win32_ComputerSystem).Domain
+
+# Add selected groups to the Remote Desktop Users group
+foreach ($group in $groups) {
+    $group = $group.Trim()  # Trim any leading or trailing whitespace
+    $RemoteDesktopGroup = [ADSI]"WinNT://./Remote Desktop Users,group"
+    $DomainGroupPath = "WinNT://$DomainName/$group,group"
+    
+    # Check if the group exists
+    try {
+        $adGroup = [ADSI]"WinNT://$DomainName/$group,group"
+        $adGroup.psbase.Name  # Access a property to force a bind and check existence
+        $groupExists = $true
+    }
+    catch {
+        $groupExists = $false
+    }
+
+    if ($groupExists) {
+        try {
+            $RemoteDesktopGroup.Add($DomainGroupPath)
+            Write-Host "Successfully added '$group' to the 'Remote Desktop Users' group." -ForegroundColor Green
+        }
+        catch {
+            Write-Host "Failed to add '$group' to the 'Remote Desktop Users' group. Error: $_" -ForegroundColor Red
+        }
+    }
+    else {
+        Write-Host "Group '$group' does not exist in the domain '$DomainName'." -ForegroundColor Yellow
+    }
+}
     # Check if the file exists
     if (Test-Path $machineConfigPath) {
         try {
