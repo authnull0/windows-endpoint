@@ -438,6 +438,7 @@ char *base64_encode(const char *input, int length)
 // Function to create the Authorization header
 char *create_auth_header(const char *clientId, const char *clientSecret)
 {
+    pam_syslog(pamh, LOG_DEBUG, "Inside create auth header function...");
     // Concatenate clientID and clientSecret with ":"
     size_t input_length = strlen(clientId) + strlen(clientSecret) + 2; // 1 for ":" and 1 for '\0'
     char *input = (char *)malloc(input_length);
@@ -452,12 +453,14 @@ char *create_auth_header(const char *clientId, const char *clientSecret)
     char *auth_header = (char *)malloc(header_length);
     snprintf(auth_header, header_length, "Basic %s", encoded);
     free(encoded);
-
+    pam_syslog(pamh, LOG_DEBUG, "Authorization Header set...");
+    pam_syslog(pamh, LOG_DEBUG, "Authorization Header: %s", auth_header);
     return auth_header;
 }
 
 char *FetchToken(pam_handle_t *pamh, const char *sspUrl, const char *tenantName, const char *clientId, const char *clientSecret)
 {
+    pam_syslog(pamh, LOG_DEBUG, "Inside Fetch Token function...");
     CURL *curl;
     CURLcode res;
 
@@ -508,6 +511,7 @@ char *FetchToken(pam_handle_t *pamh, const char *sspUrl, const char *tenantName,
     headers = curl_slist_append(headers, authHeader);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
+    pam_syslog(pamh, LOG_DEBUG, "Performing the token api request...");
     // Perform the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK)
@@ -522,12 +526,14 @@ char *FetchToken(pam_handle_t *pamh, const char *sspUrl, const char *tenantName,
     struct json_object *parsed_json;
     struct json_object *access_token;
     parsed_json = json_tokener_parse(chunk.memory);
+
     if (!parsed_json)
     {
         pam_syslog(pamh, LOG_DEBUG, "Failed to parse JSON response\n");
         return NULL;
     }
 
+    pam_syslog(pamh, LOG_DEBUG, "Parsed JSON %s", parsed_json);
     if (json_object_object_get_ex(parsed_json, "access_token", &access_token))
     {
         const char *token = json_object_get_string(access_token);
@@ -537,6 +543,8 @@ char *FetchToken(pam_handle_t *pamh, const char *sspUrl, const char *tenantName,
         curl_easy_cleanup(curl);
         curl_global_cleanup();
         free(chunk.memory);
+
+        pam_syslog(pamh, LOG_DEBUG, "Access Token: %s\n", result);
         return result;
     }
     else
