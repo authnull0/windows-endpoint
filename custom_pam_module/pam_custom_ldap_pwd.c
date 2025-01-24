@@ -561,8 +561,8 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         }
         else
         {
-            // return PAM_AUTH_ERR;
-            return PAM_SUCCESS;
+            return PAM_AUTH_ERR;
+            // return PAM_SUCCESS;
         }
     }
 }
