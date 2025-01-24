@@ -11,7 +11,7 @@ auth_string="${client_id}:${client_secret}"
 auth_base64=$(echo -n "$auth_string" | base64 | tr -d '\n')
 
 # Use the base64-encoded string in the Authorization header
-response=$(curl -s --location 'https://ssp.test-31.dev-ssp.com:31913/default/oauth2/v1/token' \
+response=$(curl -s --location 'https://ssp.test-31.dev-ssp.com/default/oauth2/v1/token' \
     --header 'Content-Type: application/x-www-form-urlencoded' \
     --header "Authorization: Basic $auth_base64" \
     --data-urlencode 'grant_type=client_credentials' \
@@ -101,7 +101,7 @@ echo "First arg is $1"
 
 
 # Make API call to do-authenticationV4
-response=$(curl -s --location 'https://ssp.test-31.dev-ssp.com:31913/default/pwlessauthn/v1/client/auth/api/v3/do-authenticationV4' \
+response=$(curl -s --location 'https://ssp.test-31.dev-ssp.com/default/pwlessauthn/v1/client/auth/api/v3/do-authenticationV4' \
     --header 'Content-Type: application/json' \
     --header "Authorization: Bearer $access_token" \
     --data "$(generate_post_data)")
