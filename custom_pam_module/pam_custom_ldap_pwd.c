@@ -4,11 +4,16 @@
 #include <string.h>
 #include <ldap.h>
 #include <unistd.h>
-
+#include <curl/curl.h>
+#include <uuid/uuid.h>
+#include <cjson/cJSON.h>
 #include <syslog.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <pwd.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/buffer.h>
 // #include "ldap_utils.h" // Include the common header
 
 #define LINE_BUFSIZE 128
@@ -21,6 +26,7 @@
 #define MAX_STRING_LENGTH 256
 #define MAX_TOKENS 3
 #define MAX_TOKEN_LENGTH 16
+#define MAX_PAYLOAD_SIZE 2048
 
 static LDAP *ldap_handle = NULL;
 
@@ -162,33 +168,6 @@ int get_ldap_user_local(const char *username, struct passwd *pwd, char *buffer, 
             }
         }
     }
-    /*char **uid = ldap_get_values(ldap_handle, entry, "sAMAccountName");
-    printf("sAMAccountName %s\n",*uid);
-    char **uidNumber = ldap_get_values(ldap_handle, entry, "uidNumber");
-    char **gidNumber = ldap_get_values(ldap_handle, entry, "gidNumber");
-    char **homeDirectory = ldap_get_values(ldap_handle, entry, "homeDirectory");
-    char **loginShell = ldap_get_values(ldap_handle, entry, "loginShell");
-
-    if (uid && uidNumber && gidNumber && homeDirectory && loginShell) {
-        pwd->pw_name = strdup(uid[0]);
-        pwd->pw_uid = atoi(uidNumber[0]);
-        pwd->pw_gid = atoi(gidNumber[0]);
-        pwd->pw_dir = strdup(homeDirectory[0]);
-        pwd->pw_shell = strdup(loginShell[0]);
-        pwd->pw_passwd = "x"; // or use a hashed password if you store it
-
-        ldap_value_free(uid);
-        ldap_value_free(uidNumber);
-        ldap_value_free(gidNumber);
-        ldap_value_free(homeDirectory);
-        ldap_value_free(loginShell);
-    } else {
-        ldap_msgfree(res);
-        ldap_memfree(dn);
-        return -1;
-    }
-    */
-    // ldap_memfree(dn);
     ldap_msgfree(res);
 
     return 0;
@@ -260,32 +239,6 @@ void get_last_ip_address(pam_handle_t *pamh, char *source, char *source_port)
     {
 
         extract_info(line, rhost, port);
-
-        // pam_syslog(pamh, LOG_DEBUG, "PAM_RHOST: %s\n", rhost);
-        // pam_syslog(pamh, LOG_DEBUG, "SSH Connection Port: %s\n", port);
-
-        /*
-  linenr++;
-    char *prefix = "PAM_RHOST=";
-    if (strncmp(line, prefix, strlen(prefix)) == 0) {
-        free(last_ip);
-        last_ip = strdup(line + strlen(prefix));
-        // Remove newline character from the end
-        last_ip[strcspn(last_ip, "\n")] = '\0';
-       // Log the extracted IP address
-        printf("Extracted IP from line %d: %s", linenr, last_ip);
-    }
-
-
-    char *ssh_prefix = "SSH_CONNECTION=";
-
-    if (strncmp(line, ssh_prefix, strlen(ssh_prefix)) == 0) {
-            free(last_ssh_con);
-            last_ssh_con = strdup(line + strlen(ssh_prefix));
-            last_ssh_con[strcspn(last_ssh_con, "\n")] = '\0';
-            printf("Extracted SSH CON from line %d: %s", linenr, last_ssh_con);
-            pam_syslog(pamh, LOG_DEBUG, "Extracted SSH CONN from line %d: %s", linenr, last_ssh_con);
-    }*/
     }
 
     fclose(file);
@@ -307,6 +260,147 @@ void parse_arguments(int argc, const char **argv, char *remote_host)
     }
 }
 
+// Function to write the response to a buffer
+struct MemoryStruct
+{
+    char *memory;
+    size_t size;
+};
+
+static size_t WriteMemoryCallback(pam_handle_t *pamh, void *contents, size_t size, size_t nmemb, void *userp)
+{
+    size_t realsize = size * nmemb;
+    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+
+    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
+    if (ptr == NULL)
+    {
+        pam_syslog(pamh, LOG_DEBUG, "not enough memory (realloc returned NULL)\n");
+        return 0;
+    }
+
+    mem->memory = ptr;
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+
+    return realsize;
+}
+
+// Function to execute external API call
+int external_call_api(const char *user, const char *source_ip, const char *source_port)
+{
+    char hostname[256];
+    char group_buffer[1024];
+    char groups[512] = {0};
+    char credential_type[64] = {0};
+    uuid_t bin_uuid;
+    char uuid[37]; // UUID is 36 characters + null terminator
+    char payload[MAX_PAYLOAD_SIZE];
+    struct passwd *pw;
+    int user_id;
+
+    // Get hostname
+    if (gethostname(hostname, sizeof(hostname)) != 0)
+    {
+        perror("gethostname");
+        return -1;
+    }
+
+    // Get groups for the user
+    snprintf(group_buffer, sizeof(group_buffer), "id -Gn %s", user);
+    FILE *group_fp = popen(group_buffer, "r");
+    if (group_fp)
+    {
+        if (fgets(groups, sizeof(groups), group_fp) == NULL)
+        {
+            fprintf(stderr, "Failed to get groups for user: %s\n", user);
+        }
+        pclose(group_fp);
+    }
+
+    // Get user ID
+    pw = getpwnam(user);
+    if (!pw)
+    {
+        fprintf(stderr, "User %s not found\n", user);
+        strcpy(credential_type, "AD");
+    }
+    else
+    {
+        user_id = pw->pw_uid;
+        if (user_id >= 1 && user_id <= 999)
+        {
+            strcpy(credential_type, "ServiceAccount");
+        }
+        else
+        {
+            strcpy(credential_type, "SSH");
+        }
+    }
+
+    // Generate UUID
+    uuid_generate_random(bin_uuid);
+    uuid_unparse(bin_uuid, uuid);
+
+    // Construct JSON payload
+    snprintf(payload, sizeof(payload),
+             "{"
+             "\"username\": \"%s\","
+             "\"credentialType\": \"%s\","
+             "\"hostname\": \"%s\","
+             "\"groupName\": \"%s\","
+             "\"requestId\": \"%s\","
+             "\"sourceIp\": \"%s\","
+             "\"port\": \"%s\""
+             "}",
+             user, credential_type, hostname, groups, uuid, source_ip, source_port);
+
+    printf("Payload: %s\n", payload);
+
+    // Make API call using libcurl
+    CURL *curl = curl_easy_init();
+    if (curl)
+    {
+        CURLcode res;
+        struct curl_slist *headers = NULL;
+        char *access_token = "YOUR_ACCESS_TOKEN"; // Replace with a valid token
+        char auth_header[512];
+
+        snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s", access_token);
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        headers = curl_slist_append(headers, auth_header);
+
+        curl_easy_setopt(curl, CURLOPT_URL, "https://ssp.test-31.dev-ssp.com/default/pwlessauthn/v1/client/auth/api/v3/do-authenticationV4");
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload);
+
+        res = curl_easy_perform(curl);
+        if (res != CURLE_OK)
+        {
+            fprintf(stderr, "Curl request failed: %s\n", curl_easy_strerror(res));
+            curl_slist_free_all(headers);
+            curl_easy_cleanup(curl);
+            return -1; // API call failed
+        }
+        else
+        {
+            printf("API call successful.\n");
+        }
+
+        // Cleanup
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+    }
+    else
+    {
+        fprintf(stderr, "Curl initialization failed.\n");
+        return -1;
+    }
+
+    return 0; // API call successful
+}
+
 // Helper function to get a parameter value
 static const char *get_pam_param(int argc, const char **argv, const char *key)
 {
@@ -319,10 +413,150 @@ static const char *get_pam_param(int argc, const char **argv, const char *key)
     }
     return NULL;
 }
+// Function to Base64-encode a string
+char *base64_encode(const char *input, int length)
+{
+    BIO *b64, *bmem;
+    BUF_MEM *bptr;
+
+    b64 = BIO_new(BIO_f_base64());
+    bmem = BIO_new(BIO_s_mem());
+    b64 = BIO_push(b64, bmem);
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL); // Ignore newlines
+    BIO_write(b64, input, length);
+    BIO_flush(b64);
+    BIO_get_mem_ptr(b64, &bptr);
+
+    char *encoded = (char *)malloc(bptr->length + 1);
+    memcpy(encoded, bptr->data, bptr->length);
+    encoded[bptr->length] = '\0';
+
+    BIO_free_all(b64);
+
+    return encoded;
+}
+// Function to create the Authorization header
+char *create_auth_header(const char *clientId, const char *clientSecret)
+{
+    // Concatenate clientID and clientSecret with ":"
+    size_t input_length = strlen(clientId) + strlen(clientSecret) + 2; // 1 for ":" and 1 for '\0'
+    char *input = (char *)malloc(input_length);
+    snprintf(input, input_length, "%s:%s", clientId, clientSecret);
+
+    // Base64-encode the concatenated string
+    char *encoded = base64_encode(input, strlen(input));
+    free(input);
+
+    // Prepend "Basic " to the encoded string
+    size_t header_length = strlen("Basic ") + strlen(encoded) + 1;
+    char *auth_header = (char *)malloc(header_length);
+    snprintf(auth_header, header_length, "Basic %s", encoded);
+    free(encoded);
+
+    return auth_header;
+}
+
+char *FetchToken(pam_handle_t *pamh, const char *sspUrl, const char *tenantName, const char *clientId, const char *clientSecret)
+{
+    CURL *curl;
+    CURLcode res;
+
+    if (!sspUrl || !tenantName || !clientId || !clientSecret)
+    {
+        pam_syslog(pamh, LOG_DEBUG, "Invalid input parameters");
+        return NULL;
+    }
+
+    // Prepare the URL
+    char tokenURL[512];
+    snprintf(tokenURL, sizeof(tokenURL), "%s%s/oauth2/v1/token", sspUrl, tenantName);
+    // printf("Token URL: %s\n", tokenURL);
+
+    // Prepare the Basic Auth header
+    char auth[256];
+    snprintf(auth, sizeof(auth), "%s:%s", clientId, clientSecret);
+    char authHeader[512];
+    char *auth_header = create_auth_header(clientId, clientSecret);
+    snprintf(authHeader, sizeof(authHeader), "Authorization: %s", auth_header);
+    // printf("Authorization Header: %s\n", authHeader);
+
+    // Prepare form data
+    const char *formData = "grant_type=client_credentials&scope=urn:iam:myscopes";
+
+    // Initialize the memory structure to hold the response
+    struct MemoryStruct chunk;
+    chunk.memory = malloc(1); // will grow as needed by the realloc above
+    chunk.size = 0;           // no data at this point
+
+    // Initialize libcurl
+    curl_global_init(CURL_GLOBAL_ALL);
+    curl = curl_easy_init();
+    if (!curl)
+    {
+        pam_syslog(pamh, LOG_DEBUG, "Failed to initialize CURL\n");
+        return NULL;
+    }
+
+    // Set CURL options
+    curl_easy_setopt(curl, CURLOPT_URL, tokenURL);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, formData);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
+    headers = curl_slist_append(headers, authHeader);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    // Perform the request
+    res = curl_easy_perform(curl);
+    if (res != CURLE_OK)
+    {
+        pam_syslog(pamh, LOG_DEBUG, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        curl_easy_cleanup(curl);
+        curl_global_cleanup();
+        return NULL;
+    }
+
+    // Parse the response JSON
+    struct json_object *parsed_json;
+    struct json_object *access_token;
+    parsed_json = json_tokener_parse(chunk.memory);
+    if (!parsed_json)
+    {
+        pam_syslog(pamh, LOG_DEBUG, "Failed to parse JSON response\n");
+        return NULL;
+    }
+
+    if (json_object_object_get_ex(parsed_json, "access_token", &access_token))
+    {
+        const char *token = json_object_get_string(access_token);
+        char *result = strdup(token);
+        json_object_put(parsed_json);
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+        curl_global_cleanup();
+        free(chunk.memory);
+        return result;
+    }
+    else
+    {
+        pam_syslog(pamh, LOG_DEBUG, "access_token not found in the response\n");
+        json_object_put(parsed_json);
+    }
+
+    // Cleanup
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+    curl_global_cleanup();
+    free(chunk.memory);
+    free(auth_header);
+
+    return NULL;
+}
 
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-
     const char *ssh_connection;
     const char *ssh_connection_env_var = "SSH_CONNECTION";
     char buffer[MAX_STRING_LENGTH] = "";
@@ -331,72 +565,72 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     char source_port[6] = {0};
 
     const char *sspURL;
+    const char *tenantName;
     const char *clientId;
     const char *clientSecret;
-    // Get PAM_RHOST environment variable
+
     ssh_connection = pam_getenv(pamh, ssh_connection_env_var);
-    // pam_syslog(pamh, LOG_DEBUG, "Remote host in PAM %s\n", ssh_connection);
 
     sspURL = get_pam_param(argc, argv, "ssp");
+    tenantName = get_pam_param(argc, argv, "tenant");
     clientId = get_pam_param(argc, argv, "client_id");
     clientSecret = get_pam_param(argc, argv, "secret");
 
-    pam_syslog(pamh, LOG_DEBUG, "SSP URL %s\n", sspURL);
-    pam_syslog(pamh, LOG_DEBUG, "Client ID %s\n", clientId);
-    pam_syslog(pamh, LOG_DEBUG, "Client Secret %s\n", clientSecret);
+    pam_syslog(pamh, LOG_DEBUG, "SSP URL: %s", sspURL);
+    pam_syslog(pamh, LOG_DEBUG, "Tenant Name: %s", tenantName);
+    pam_syslog(pamh, LOG_DEBUG, "Client ID: %s", clientId);
+    pam_syslog(pamh, LOG_DEBUG, "Client Secret: %s", clientSecret);
+
+    char *token = FetchToken(pamh, sspURL, tenantName, clientId, clientSecret);
+
+    if (token)
+    {
+        pam_syslog(pamh, LOG_DEBUG, "Token: %s\n", token);
+        free(token); // Free the token after use
+    }
+    else
+    {
+        pam_syslog(pamh, LOG_DEBUG, "Failed to fetch token\n");
+    }
 
     if (ssh_connection)
     {
-        snprintf(buffer, sizeof(buffer), "Remote Host: %s\n", ssh_connection);
         char *ssh_connection_copy;
         char *token;
         char tokens[MAX_TOKENS][MAX_TOKEN_LENGTH];
 
-        // Allocate memory for the string copy
         ssh_connection_copy = strdup(ssh_connection);
         if (ssh_connection_copy == NULL)
         {
-            pam_syslog(pamh, LOG_DEBUG, "Error copying the ssh_connection %s\n", ssh_connection);
+            pam_syslog(pamh, LOG_DEBUG, "Error copying ssh_connection: %s", ssh_connection);
         }
 
-        // Tokenize the string
         token = strtok(ssh_connection_copy, " ");
         while (token != NULL && i < MAX_TOKENS)
         {
             strncpy(tokens[i], token, MAX_TOKEN_LENGTH - 1);
-            tokens[i][MAX_TOKEN_LENGTH - 1] = '\0'; // Ensure null termination
+            tokens[i][MAX_TOKEN_LENGTH - 1] = '\0';
             i++;
             token = strtok(NULL, " ");
         }
 
-        // Identify source IP
-        // get_last_ip_address(pamh, source_host, source_port);
         strncpy(source_host, tokens[0], 16);
         strncpy(source_port, tokens[1], 6);
+
         if (source_host == NULL)
         {
-            pam_syslog(pamh, LOG_DEBUG, "Failed to retrieve the last IP address from the log file");
-            // return PAM_AUTH_ERR;
+            pam_syslog(pamh, LOG_DEBUG, "Failed to retrieve the source host.");
         }
-        // Store the source IP in a variable
+
         pam_syslog(pamh, LOG_DEBUG, "Source IP: %s", source_host);
     }
     else
     {
-        // sprintf(buffer, sizeof(buffer), "PAM_RHOST not set\n");
         pam_syslog(pamh, LOG_DEBUG, "PAM_RHOST not set");
     }
+
     const char *user;
-    const char *pass;
-    int retval;
-
-    char *attribute;
-    BerElement *ber;
-    char **values;
-    i = 0;
-
-    // Get the username
-    retval = pam_get_user(pamh, &user, NULL);
+    int retval = pam_get_user(pamh, &user, NULL);
     if (retval != PAM_SUCCESS)
     {
         return retval;
@@ -404,193 +638,101 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     if (strcmp("root", user) == 0)
     {
-        pam_syslog(pamh, LOG_DEBUG, "This is root user %s", user);
-
-        // Get the password from the user
-        // retval = get_password(pamh, &pass);
-        /*if (retval != PAM_SUCCESS) {
-                return PAM_SUCCESS;
-
-        } */
+        pam_syslog(pamh, LOG_DEBUG, "This is the root user: %s", user);
         return PAM_SUCCESS;
     }
     else if (getpwnam(user) != NULL)
     {
-        char *s;
-        int len;
-        char command[100];
-        char line[LINE_BUFSIZE];
-        FILE *output;
-        /*char source_host[16]= {0};
-        char source_port[6] = {0};
-        // Identify source IP
-        //get_last_ip_address(pamh, source_host, source_port);
-        strncpy(source_host, tokens[0], 16);
-        strncpy(source_port, tokens[1], 6);
-        if (source_host == NULL) {
-                pam_syslog(pamh, LOG_DEBUG,"Failed to retrieve the last IP address from the log file");
-                return PAM_AUTH_ERR;
-        }
+        pam_syslog(pamh, LOG_DEBUG, "Authenticated local user: %s", user);
 
-        // Store the source IP in a variable
-        pam_syslog(pamh,LOG_DEBUG, "Source IP LOCAL : %s", source_host);
-        */
-
-        len = snprintf(command, sizeof(command), "/bin/bash ${cwd}/did.sh %s %s %s", user, source_host, source_port);
-        output = popen(command, "r"); // update this location based on user path , and copy the script inside src/ to user path (if reqd)
-
-        if (output == NULL)
+        int api_result = external_call_api(user, source_host, source_port);
+        if (api_result == 0)
         {
-            pam_syslog(pamh, LOG_DEBUG, "POPEN: Failed to execute\n");
+            pam_syslog(pamh, LOG_DEBUG, "DID Authentication Successful!");
+            return PAM_SUCCESS;
         }
         else
         {
-            int count = 1;
-
-            while (fgets(line, LINE_BUFSIZE - 1, output) != NULL)
-            {
-                pam_syslog(pamh, LOG_DEBUG, "Execution Result %s", line);
-                s = myStrStr(line, "\"isValid\"\:true");
-                if (s)
-                {
-                    pam_syslog(pamh, LOG_DEBUG, "DID Authentication Successful !%d", s);
-                    return PAM_SUCCESS;
-                }
-            }
+            pam_syslog(pamh, LOG_DEBUG, "DID Authentication Failed.");
+            // return PAM_AUTH_ERR;
+            return PAM_SUCCESS;
         }
-
-        return PAM_SUCCESS;
     }
     else
     {
-        pam_syslog(pamh, LOG_DEBUG, "%s not found in the system", user);
-        if (init_ldap() != 0)
-            return PAM_AUTHINFO_UNAVAIL;
+        pam_syslog(pamh, LOG_DEBUG, "%s not found in the system.", user);
 
-        pam_syslog(pamh, LOG_DEBUG, "Init LDAP");
+        if (init_ldap() != 0)
+        {
+            return PAM_AUTHINFO_UNAVAIL;
+        }
+
         char filter[256];
         snprintf(filter, sizeof(filter), LDAP_SEARCH_FILTER, user);
-        pam_syslog(pamh, LOG_DEBUG, "Filter %s", filter);
+        pam_syslog(pamh, LOG_DEBUG, "Filter: %s", filter);
+
         LDAPMessage *res, *entry;
         retval = ldap_search_ext_s(ldap_handle, BASE_DN, LDAP_SCOPE_SUBTREE, filter, NULL, 0, NULL, NULL, NULL, 0, &res);
-        pam_syslog(pamh, LOG_DEBUG, "Ret VAL %d", retval);
         if (retval != LDAP_SUCCESS)
+        {
             return PAM_USER_UNKNOWN;
+        }
 
         entry = ldap_first_entry(ldap_handle, res);
         if (entry == NULL)
         {
             ldap_msgfree(res);
-            pam_syslog(pamh, LOG_DEBUG, "%s not found in LDAP", user);
+            pam_syslog(pamh, LOG_DEBUG, "%s not found in LDAP.", user);
             return PAM_USER_UNKNOWN;
         }
 
         char *dn = ldap_get_dn(ldap_handle, entry);
         ldap_msgfree(res);
         if (!dn)
-            return PAM_AUTHINFO_UNAVAIL;
-
-        pam_syslog(pamh, LOG_DEBUG, "Username: %s, Password: %s, DN: %s", user, pass, dn);
-        // retval = ldap_simple_bind_s(ldap_handle, dn, pass);
-        ldap_memfree(dn);
-        printf("LDAP_SUCCESS VALUE %d\n", retval);
-
-        if (retval == LDAP_SUCCESS)
         {
-            pam_syslog(pamh, LOG_DEBUG, "LDAP_SUCCESS %d", retval);
-            struct passwd *pwd = malloc(sizeof(struct passwd));
-            if (pwd == NULL)
-            {
-                return PAM_BUF_ERR;
-            }
-            char *buffer = malloc(1024 * sizeof(char));
-            if (buffer == NULL)
+            return PAM_AUTHINFO_UNAVAIL;
+        }
+
+        pam_syslog(pamh, LOG_DEBUG, "LDAP DN: %s", dn);
+
+        struct passwd *pwd = malloc(sizeof(struct passwd));
+        char *buffer = malloc(1024 * sizeof(char));
+        if (!pwd || !buffer)
+        {
+            free(pwd);
+            free(buffer);
+            return PAM_BUF_ERR;
+        }
+
+        if (get_ldap_user_local(user, pwd, buffer, 1024) == 0)
+        {
+            if (create_local_user(user, pwd) != 0)
             {
                 free(pwd);
-                return PAM_BUF_ERR;
+                free(buffer);
+                return PAM_PERM_DENIED;
             }
-            pam_syslog(pamh, LOG_DEBUG, "Trace %d", 0);
-            // int user_local = get_ldap_user_local(user, pwd, buffer, 1024);
-            // pam_syslog(pamh, LOG_DEBUG, "get_ldap_user %d", user_local);
-            if (get_ldap_user_local(user, pwd, buffer, 1024) == 0)
+
+            int api_result = external_call_api(user, source_host, source_port);
+            if (api_result == 0)
             {
-                // Create local user if authentication is successful
-                // pam_syslog(pamh,LOG_DEBUG, "create local user %d", create_local_user(user, pwd));
-
-                // Check if the local user exists
-                // struct passwd *local_user = getpwnam(user);
-                if (/*local_user == NULL && */ create_local_user(user, pwd) != 0)
-                {
-                    free(pwd);
-                    free(buffer);
-                    return PAM_PERM_DENIED;
-                }
-
-                char *s;
-                int len;
-                char command[100];
-                char line[LINE_BUFSIZE];
-                FILE *output;
-
-                /*char source_host[16] = {0};
-                char source_port[6] = {0};
-
-                // Identify source IP
-                //get_last_ip_address(pamh, source_host, source_port);
-                strncpy(source_host, tokens[0], 16);
-                strncpy(source_port, tokens[1], 6);
-                if (source_host == NULL) {
-                        pam_syslog(pamh, LOG_DEBUG,"Failed to retrieve the last IP address from the log file");
-                        return PAM_AUTH_ERR;
-                }
-
-                // Store the source IP in a variable
-                pam_syslog(pamh,LOG_DEBUG, "Source IP: %s", source_host);
-                */
-
-                len = snprintf(command, sizeof(command), "/bin/bash ${cwd}/did.sh %s %s %s", user, source_host, source_port);
-                output = popen(command, "r"); // update this location based on user path , and copy the script inside src/ to user path (if reqd)
-
-                if (output == NULL)
-                {
-                    pam_syslog(pamh, LOG_DEBUG, "POPEN: Failed to execute\n");
-                }
-                else
-                {
-                    int count = 1;
-
-                    while (fgets(line, LINE_BUFSIZE - 1, output) != NULL)
-                    {
-                        pam_syslog(pamh, LOG_DEBUG, "Execution Result %s", line);
-                        // s = myStrStr(line,"\"isValid\":\"true\"");
-                        s = myStrStr(line, "\"isValid\"\:true");
-                        if (s)
-                        {
-                            pam_syslog(pamh, LOG_DEBUG, "DID Authentication Successful !%d", s);
-                            return PAM_SUCCESS;
-                        }
-                    }
-                }
-
+                pam_syslog(pamh, LOG_DEBUG, "DID Authentication Successful!");
+                free(pwd);
+                free(buffer);
                 return PAM_SUCCESS;
             }
             else
             {
-                free(pwd);
-                free(buffer);
-                // return PAM_USER_UNKNOWN;
-                return PAM_SUCCESS;
+                pam_syslog(pamh, LOG_DEBUG, "DID Authentication Failed.");
             }
-            free(pwd);
-            free(buffer);
-            return LDAP_SUCCESS;
         }
-        else
-        {
-            // return PAM_AUTH_ERR;
-            return PAM_SUCCESS;
-        }
+
+        free(pwd);
+        free(buffer);
     }
+
+    // return PAM_AUTH_ERR;
+    return PAM_SUCCESS;
 }
 
 PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
