@@ -288,7 +288,7 @@ static size_t WriteMemoryCallback(pam_handle_t *pamh, void *contents, size_t siz
 }
 
 // Function to execute external API call
-int external_call_api(const char *user, const char *source_ip, const char *source_port)
+int external_call_api(const char *user, const char *source_ip, const char *source_port, const char *access_token)
 {
     char hostname[256];
     char group_buffer[1024];
@@ -364,7 +364,7 @@ int external_call_api(const char *user, const char *source_ip, const char *sourc
     {
         CURLcode res;
         struct curl_slist *headers = NULL;
-        char *access_token = "YOUR_ACCESS_TOKEN"; // Replace with a valid token
+
         char auth_header[512];
 
         snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s", access_token);
@@ -653,7 +653,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     {
         pam_syslog(pamh, LOG_DEBUG, "Authenticated local user: %s", user);
 
-        int api_result = external_call_api(user, source_host, source_port);
+        int api_result = external_call_api(user, source_host, source_port, token);
         if (api_result == 0)
         {
             pam_syslog(pamh, LOG_DEBUG, "DID Authentication Successful!");
@@ -721,7 +721,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
                 return PAM_PERM_DENIED;
             }
 
-            int api_result = external_call_api(user, source_host, source_port);
+            int api_result = external_call_api(user, source_host, source_port, token);
             if (api_result == 0)
             {
                 pam_syslog(pamh, LOG_DEBUG, "DID Authentication Successful!");
