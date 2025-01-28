@@ -30,6 +30,33 @@
 
 static LDAP *ldap_handle = NULL;
 
+struct Memory
+{
+    char *response;
+    size_t size;
+};
+
+// Callback function to handle the response data
+static size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp)
+{
+    size_t realsize = size * nmemb;
+    struct Memory *mem = (struct Memory *)userp;
+
+    char *ptr = realloc(mem->response, mem->size + realsize + 1);
+    if (ptr == NULL)
+    {
+        fprintf(stderr, "Not enough memory to allocate buffer.\n");
+        return 0;
+    }
+
+    mem->response = ptr;
+    memcpy(&(mem->response[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->response[mem->size] = '\0';
+
+    return realsize;
+}
+
 static int init_ldap()
 {
     if (ldap_handle == NULL)
@@ -436,7 +463,7 @@ char *base64_encode(const char *input, int length)
     return encoded;
 }
 // Function to create the Authorization header
-char *create_auth_header(const char *clientId, const char *clientSecret)
+char *create_auth_header(pam_handle_t *pamh, const char *clientId, const char *clientSecret)
 {
     pam_syslog(pamh, LOG_DEBUG, "Inside create auth header function...");
     // Concatenate clientID and clientSecret with ":"
@@ -446,121 +473,209 @@ char *create_auth_header(const char *clientId, const char *clientSecret)
 
     // Base64-encode the concatenated string
     char *encoded = base64_encode(input, strlen(input));
+    pam_syslog(pamh, LOG_DEBUG, "Encoded string: %s", encoded);
     free(input);
 
     // Prepend "Basic " to the encoded string
-    size_t header_length = strlen("Basic ") + strlen(encoded) + 1;
-    char *auth_header = (char *)malloc(header_length);
-    snprintf(auth_header, header_length, "Basic %s", encoded);
-    free(encoded);
-    pam_syslog(pamh, LOG_DEBUG, "Authorization Header set...");
-    pam_syslog(pamh, LOG_DEBUG, "Authorization Header: %s", auth_header);
-    return auth_header;
+    // size_t header_length = strlen("Basic ") + strlen(encoded) + 1;
+    // char *auth_header = (char *)malloc(header_length);
+    // snprintf(auth_header, header_length, "Authorization: Basic %s", encoded);
+    // free(encoded);
+    // pam_syslog(pamh, LOG_DEBUG, "Authorization Header set...");
+    // pam_syslog(pamh, LOG_DEBUG, "Authorization Header: %s", auth_header);
+    return encoded;
 }
 
 char *FetchToken(pam_handle_t *pamh, const char *sspUrl, const char *tenantName, const char *clientId, const char *clientSecret)
 {
+    // pam_syslog(pamh, LOG_DEBUG, "Inside Fetch Token function...");
+    // if (!sspUrl || !tenantName || !clientId || !clientSecret)
+    // {
+    //     pam_syslog(pamh, LOG_ERR, "Invalid input parameters");
+    //     return NULL;
+    // }
+
+    // // Prepare the token URL
+    // char tokenURL[512];
+    // snprintf(tokenURL, sizeof(tokenURL), "%s%s/oauth2/v1/token", sspUrl, tenantName);
+    // pam_syslog(pamh, LOG_DEBUG, "Token URL: %s", tokenURL);
+
+    // // Create Authorization header
+    // char *authHeader = create_auth_header(pamh, clientId, clientSecret);
+    // if (!authHeader)
+    // {
+    //     pam_syslog(pamh, LOG_ERR, "Failed to create Authorization header");
+    //     return NULL;
+    // }
+    // pam_syslog(pamh, LOG_DEBUG, "Authorization header created successfully");
+
+    // // Prepare form data
+    // const char *formData = "grant_type=client_credentials&scope=urn:iam:myscopes";
+    // pam_syslog(pamh, LOG_DEBUG, "Prepared form data: %s", formData);
+    // // Initialize response memory
+    // struct MemoryStruct chunk = {malloc(1), 0};
+    // if (!chunk.memory)
+    // {
+    //     pam_syslog(pamh, LOG_ERR, "Failed to allocate memory for response");
+    //     free(authHeader);
+    //     return NULL;
+    // }
+
+    // // Initialize CURL
+    // CURL *curl = curl_easy_init();
+    // if (!curl)
+    // {
+    //     pam_syslog(pamh, LOG_ERR, "Failed to initialize CURL");
+    //     free(chunk.memory);
+    //     free(authHeader);
+    //     return NULL;
+    // }
+    // pam_syslog(pamh, LOG_DEBUG, "CURL initialized successfully");
+
+    // // Set CURL options
+    // curl_easy_setopt(curl, CURLOPT_URL, tokenURL);
+    // curl_easy_setopt(curl, CURLOPT_POSTFIELDS, formData);
+    // curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    // curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+    // curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);       // Timeout after 10 seconds
+    // curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L); // Timeout after 5 seconds to connect
+
+    // pam_syslog(pamh, LOG_DEBUG, "Token URL: %s", tokenURL);
+    // pam_syslog(pamh, LOG_DEBUG, "Authorization Header: %s", authHeader);
+    // pam_syslog(pamh, LOG_DEBUG, "Form Data: %s", formData);
+
+    // struct curl_slist *headers = NULL;
+    // headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
+    // headers = curl_slist_append(headers, authHeader);
+    // curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    // pam_syslog(pamh, LOG_DEBUG, "Headers set successfully");
+
+    // // Perform CURL request
+    // pam_syslog(pamh, LOG_DEBUG, "Performing token request...");
+    // CURLcode res = curl_easy_perform(curl);
+    // if (res != CURLE_OK)
+    // {
+    //     pam_syslog(pamh, LOG_ERR, "CURL request failed: %s", curl_easy_strerror(res));
+    //     free(chunk.memory);
+    //     free(authHeader);
+    //     curl_slist_free_all(headers);
+    //     curl_easy_cleanup(curl);
+    //     return NULL;
+    // }
+
+    // // Check HTTP response code
+    // long http_code = 0;
+    // curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    // if (http_code != 200)
+    // {
+    //     pam_syslog(pamh, LOG_ERR, "HTTP request failed with code: %ld", http_code);
+    //     free(chunk.memory);
+    //     free(authHeader);
+    //     curl_slist_free_all(headers);
+    //     curl_easy_cleanup(curl);
+    //     return NULL;
+    // }
+
+    // // long http_code = 0;
+    // curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    // pam_syslog(pamh, LOG_DEBUG, "HTTP Response Code: %ld", http_code);
+    // pam_syslog(pamh, LOG_DEBUG, "Response: %s", chunk.memory);
+
+    // // Parse JSON response
+    // struct json_object *parsed_json = json_tokener_parse(chunk.memory);
+    // if (!parsed_json)
+    // {
+    //     pam_syslog(pamh, LOG_ERR, "Failed to parse JSON response");
+    //     free(chunk.memory);
+    //     free(authHeader);
+    //     curl_slist_free_all(headers);
+    //     curl_easy_cleanup(curl);
+    //     return NULL;
+    // }
+
+    // struct json_object *access_token;
+    // char *result = NULL;
+    // if (json_object_object_get_ex(parsed_json, "access_token", &access_token))
+    // {
+    //     result = strdup(json_object_get_string(access_token));
+    //     pam_syslog(pamh, LOG_DEBUG, "Access Token: %s", result);
+    // }
+    // else
+    // {
+    //     pam_syslog(pamh, LOG_ERR, "access_token not found in the response");
+    // }
+
+    // // Cleanup
+    // json_object_put(parsed_json);
+    // free(chunk.memory);
+    // free(authHeader);
+    // curl_slist_free_all(headers);
+    // curl_easy_cleanup(curl);
+
+    // return result;
     pam_syslog(pamh, LOG_DEBUG, "Inside Fetch Token function...");
     CURL *curl;
     CURLcode res;
+    char url[1024]; // Buffer to hold the formatted URL
 
-    if (!sspUrl || !tenantName || !clientId || !clientSecret)
-    {
-        pam_syslog(pamh, LOG_DEBUG, "Invalid input parameters");
-        return NULL;
-    }
-
-    // Prepare the URL
-    char tokenURL[512];
-    snprintf(tokenURL, sizeof(tokenURL), "%s%s/oauth2/v1/token", sspUrl, tenantName);
-    // printf("Token URL: %s\n", tokenURL);
-
-    // Prepare the Basic Auth header
-    char auth[256];
-    snprintf(auth, sizeof(auth), "%s:%s", clientId, clientSecret);
-    char authHeader[512];
-    char *auth_header = create_auth_header(clientId, clientSecret);
-    snprintf(authHeader, sizeof(authHeader), "Authorization: %s", auth_header);
-    // printf("Authorization Header: %s\n", authHeader);
-
-    // Prepare form data
-    const char *formData = "grant_type=client_credentials&scope=urn:iam:myscopes";
-
-    // Initialize the memory structure to hold the response
-    struct MemoryStruct chunk;
-    chunk.memory = malloc(1); // will grow as needed by the realloc above
-    chunk.size = 0;           // no data at this point
+    struct Memory chunk = {.response = malloc(1), .size = 0};
 
     // Initialize libcurl
-    curl_global_init(CURL_GLOBAL_ALL);
     curl = curl_easy_init();
-    if (!curl)
+    if (curl)
     {
-        pam_syslog(pamh, LOG_DEBUG, "Failed to initialize CURL\n");
-        return NULL;
-    }
+        // Set the URL
 
-    // Set CURL options
-    curl_easy_setopt(curl, CURLOPT_URL, tokenURL);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, formData);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+        snprintf(url, sizeof(url), "%s%s/oauth2/v1/token", sspUrl, tenantName);
+        pam_syslog(pamh, LOG_DEBUG, "Token URL: %s", url);
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        pam_syslog(pamh, LOG_DEBUG, "URL is set...");
 
-    struct curl_slist *headers = NULL;
-    headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
-    headers = curl_slist_append(headers, authHeader);
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+                // Call Auth header function to set the encoded header
+        const char *auth_base64 = create_auth_header(pamh, clientId, clientSecret);
+        pam_syslog(pamh, LOG_DEBUG, "Authorization Header: %s", auth_base64);
 
-    pam_syslog(pamh, LOG_DEBUG, "Performing the token api request...");
-    // Perform the request
-    res = curl_easy_perform(curl);
-    if (res != CURLE_OK)
-    {
-        pam_syslog(pamh, LOG_DEBUG, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-        curl_easy_cleanup(curl);
-        curl_global_cleanup();
-        return NULL;
-    }
+        // Set the headers
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
+        char auth_header[256];
+        snprintf(auth_header, sizeof(auth_header), "Authorization: Basic %s", auth_base64);
+        pam_syslog(pamh, LOG_DEBUG, "Authorization Header: %s", auth_base64);
+        headers = curl_slist_append(headers, auth_header);
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
-    // Parse the response JSON
-    struct json_object *parsed_json;
-    struct json_object *access_token;
-    parsed_json = json_tokener_parse(chunk.memory);
+        // Set the POST fields
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "grant_type=client_credentials&scope=urn:iam:myscopes");
+        pam_syslog(pamh, LOG_DEBUG, "Payload: %s", "grant_type=client_credentials&scope=urn:iam:myscopes");
+        // Set the callback to handle response
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
 
-    if (!parsed_json)
-    {
-        pam_syslog(pamh, LOG_DEBUG, "Failed to parse JSON response\n");
-        return NULL;
-    }
+        // Perform the request
+        res = curl_easy_perform(curl);
+        pam_syslog(pamh, LOG_DEBUG, "Curl request performed...");
+        if (res != CURLE_OK)
+        {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+            pam_syslog(pamh, LOG_DEBUG, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        }
+        else
+        {
+            // Print the response
+            printf("Response: %s\n", chunk.response);
+            pam_syslog(pamh, LOG_DEBUG, "Response: %s", chunk.response);
+        }
 
-    pam_syslog(pamh, LOG_DEBUG, "Parsed JSON %s", parsed_json);
-    if (json_object_object_get_ex(parsed_json, "access_token", &access_token))
-    {
-        const char *token = json_object_get_string(access_token);
-        char *result = strdup(token);
-        json_object_put(parsed_json);
+        // Cleanup
         curl_slist_free_all(headers);
         curl_easy_cleanup(curl);
-        curl_global_cleanup();
-        free(chunk.memory);
-
-        pam_syslog(pamh, LOG_DEBUG, "Access Token: %s\n", result);
-        return result;
+        free(chunk.response);
     }
     else
     {
-        pam_syslog(pamh, LOG_DEBUG, "access_token not found in the response\n");
-        json_object_put(parsed_json);
+        fprintf(stderr, "Failed to initialize CURL.\n");
+        pam_syslog(pamh, LOG_DEBUG, "Failed to initialize CURL.");
     }
-
-    // Cleanup
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-    curl_global_cleanup();
-    free(chunk.memory);
-    free(auth_header);
-
-    return NULL;
 }
 
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
