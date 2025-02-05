@@ -24,8 +24,38 @@ echo -n "$app_env_content" > app.env
 #copy app.env to / directory
 sudo cp app.env /
 
-# Make the agent file executable
-sudo chmod +x agentv2
+#Copy .service file to /etc/systemd/system
+cp agentv2.service /etc/systemd/system/
+echo "copying service file successfully to /etc/systemd/system/...."
+sudo chmod 644 /etc/systemd/system/agentv2.service
+echo "Changing the service file permission successfully.."
 
-# Run the agent
-sudo ./agentv2
+#Move the agentv2 to /usr/local/bin/ and give permission
+sudo cp agentv2 /usr/local/sbin/
+echo "Copied agentv2 successfully to /usr/local/sbin/.."
+sudo chmod +x /usr/local/sbin/agentv2
+sudo chmod 755 /usr/local/sbin/agentv2
+sudo chown root:root /usr/local/sbin/agentv2
+echo "Changing the agent permission successfully..."
+
+sudo cp app.env /usr/local/sbin/
+echo "copying app.env successfully.."
+sudo chmod +x /usr/local/sbin/app.env
+sudo chmod 640 /usr/local/sbin/app.env
+sudo chown root:root /usr/local/sbin/app.env
+echo "Changine app.env file permission successfully.."
+
+
+
+
+
+#Start and enable the agent 
+sudo systemctl daemon-reload
+echo "system damon reload..."
+sudo systemctl enable agentv2
+echo "enabling agent..."
+sudo systemctl start agentv2
+echo "start the agent..."
+
+
+

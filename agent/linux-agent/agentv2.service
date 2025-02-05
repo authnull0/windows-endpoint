@@ -1,0 +1,17 @@
+[Unit]
+Description=AgentV2 Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/agentv2
+Restart=on-failure
+User=root
+Group=root
+WorkingDirectory=/usr/local/sbin/
+EnvironmentFile=/usr/local/sbin/app.env
+StandardOutput=append:/var/log/agentv2.log
+StandardError=append:/var/log/agentv2.log
+
+[Install]
+WantedBy=multi-user.target
