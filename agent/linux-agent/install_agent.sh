@@ -2,6 +2,10 @@
 
 # Download the agent file
 sudo wget https://github.com/authnull0/windows-endpoint/raw/linux-agent/agent/linux-agent/authnull-agent
+echo "Authnull Agent downloaded..."
+
+sudo wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/linux-agent/agent/linux-agent/authnull-agent.service
+echo "Authnull Agent service file downloaded..."
 
 echo "Please enter the content for the app.env file. End with an empty line or Ctrl+D:"
 
