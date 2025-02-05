@@ -20,19 +20,33 @@ sudo chmod +x /usr/local/bin/log_pam_rhost.sh
 echo "Files moved. Check the logs with: tail -f /var/log/auth.log (Ubuntu) or tail -f /var/log/secure (CentOS)"
 
 # Configure SSHD File
-sudo sh -c 'echo "auth required /usr/local/lib/security/pam_google_authenticator.so debug nullok" >> /etc/pam.d/sshd'
-sudo sh -c 'echo "auth required pam_permit.so" >> /etc/pam.d/sshd'
-sudo sed -i 's/@include common-auth/#@include common-auth/g' /etc/pam.d/sshd
+if ! grep -q "auth required /usr/local/lib/security/pam_google_authenticator.so debug nullok" /etc/pam.d/sshd; then
+    sudo sh -c 'echo "auth required /usr/local/lib/security/pam_google_authenticator.so debug nullok" >> /etc/pam.d/sshd'
+fi
 
-# Configure PAM to log remote host information
-sudo sh -c 'echo "auth required pam_exec.so /usr/local/bin/log_pam_rhost.sh" >> /etc/pam.d/sshd'
+if ! grep -q "auth required pam_permit.so" /etc/pam.d/sshd; then
+    sudo sh -c 'echo "auth required pam_permit.so" >> /etc/pam.d/sshd'
+fi
+
+if grep -q "@include common-auth" /etc/pam.d/sshd; then
+    sudo sed -i 's/@include common-auth/#@include common-auth/g' /etc/pam.d/sshd
+fi
+
+if ! grep -q "auth required pam_exec.so /usr/local/bin/log_pam_rhost.sh" /etc/pam.d/sshd; then
+    sudo sh -c 'echo "auth required pam_exec.so /usr/local/bin/log_pam_rhost.sh" >> /etc/pam.d/sshd'
+fi
 
 # Log the SSHD file configuration status
 echo "SSHD file configured. Check the logs with: tail -f /var/log/auth.log (Ubuntu) or tail -f /var/log/secure (CentOS)"
 
 # Configure SSHD Config
-sudo sh -c 'echo "AuthenticationMethods keyboard-interactive" >> /etc/ssh/sshd_config'
-sudo sed -i 's/KbdInteractiveAuthentication no/KbdInteractiveAuthentication yes/g' /etc/ssh/sshd_config
+if ! grep -q "AuthenticationMethods keyboard-interactive" /etc/ssh/sshd_config; then
+    sudo sh -c 'echo "AuthenticationMethods keyboard-interactive" >> /etc/ssh/sshd_config'
+fi
+
+if grep -q "^KbdInteractiveAuthentication no" /etc/ssh/sshd_config; then
+    sudo sed -i 's/^KbdInteractiveAuthentication no/KbdInteractiveAuthentication yes/g' /etc/ssh/sshd_config
+fi
 
 # Log the SSHD config status
 echo "SSHD config configured. Check the logs with: tail -f /var/log/auth.log (Ubuntu) or tail -f /var/log/secure (CentOS)"
