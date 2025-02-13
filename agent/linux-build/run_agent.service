@@ -1,0 +1,13 @@
+[Unit]
+Description=Agent Daemon
+
+[Service]
+WorkingDirectory=/etc/authnull-db-agent/
+Type=simple
+User=authnulluser
+ExecStart=/etc/authnull-db-agent/run_agent.sh
+Restart=on-failure
+StartLimitBurst=2
+
+[Install]
+WantedBy=default.target
