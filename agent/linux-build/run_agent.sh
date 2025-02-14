@@ -8,8 +8,8 @@ NC='\033[0m'
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
-if [ ! "$PWD" = "/home/authnulluser/authnull-db-agent" ]; then
-  echo -e "${RED}Please run the script from /home/authnulluser/authnull-db-agent${NC}"
+if [ ! "$PWD" = "$HOME/authnull-db-agent" ]; then
+  echo -e "${RED}Please run the script from $HOME/authnull-db-agent${NC}"
   exit 1
 fi
 
@@ -59,6 +59,11 @@ if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
         wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/DATAB-9/agent/linux-build/run_agent.service
         sudo mv run_agent.service /etc/systemd/system/
         sudo systemctl enable run_agent.service
+
+        # Add the script to the path
+        echo "# Adding authnull-db-agent to \$PATH" >> "$HOME/.bashrc"
+        echo "export PATH=\$PATH:$HOME/authnull-db-agent" >> "$HOME/.bashrc"
+        source "$HOME/.bashrc"
 fi
 
 # Enable systemd service for the agent
