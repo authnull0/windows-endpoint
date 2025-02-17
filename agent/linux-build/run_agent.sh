@@ -8,10 +8,8 @@ NC='\033[0m'
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
-if [ ! "$PWD" = "$HOME/authnull-db-agent" ]; then
-  echo -e "${RED}Please run the script from $HOME/authnull-db-agent${NC}"
-  exit 1
-fi
+mkdir -p $HOME/authnull-db-agent
+cd $HOME/authnull-db-agent
 
 if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
 
@@ -72,3 +70,4 @@ sudo systemctl stop run_agent.service
 sudo systemctl start run_agent.service
 
 echo -e "${GREEN}=> Successfully started systemd service for the agent${NC}${NORMAL}"
+cd -
