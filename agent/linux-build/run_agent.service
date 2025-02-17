@@ -2,9 +2,7 @@
 Description=Agent Daemon
 
 [Service]
-WorkingDirectory=%h/authnull-db-agent
 Type=simple
-ExecStart=%h/authnull-db-agent/authnull-db-agent
 Restart=on-failure
 StartLimitBurst=2
 

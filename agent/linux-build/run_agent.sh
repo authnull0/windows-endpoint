@@ -56,6 +56,9 @@ if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
   sudo rm -f run_agent.service
   wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/DATAB-9/agent/linux-build/run_agent.service
+  sed -i "6 i ExecStart=/home/$USER/authnull-db-agent/authnull-db-agent" run_agent.service
+  sed -i "6 i WorkingDirectory=/home/$USER/authnull-db-agent" run_agent.service
+  sed -i "6 i User=$USER" run_agent.service
   sudo mv run_agent.service /etc/systemd/system/
   sudo systemctl enable run_agent.service
 
