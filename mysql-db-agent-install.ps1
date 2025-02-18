@@ -89,7 +89,7 @@ if (Test-Path $sourcePath) {
 #--------------------------------------------------------------------
 Write-Host ("Copying the agent to $OutputPath") -ForegroundColor Yellow
 #reusing agent path
-$AgentPath= $OutputPath + "\windows-endpoint-mysql-db-agent\agent\windows-build\windows-mysql-db-agent.exe"
+$AgentPath= $OutputPath + "\windows-endpoint-mysql-db-agent\agent\windows-build\windows-authnull-db-agent.exe"
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
 
 #---------------------------------------------------------------------------
