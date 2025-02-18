@@ -1,9 +1,15 @@
-This folder contains
+# Installation on Windows
+Download and run the installation script 
 
-- credential_provider - holds pgina binaries
-- agent - holds windows agent binaries
-- credential_provider\plugins - holds plugins
-- dependencies - any other dependencies.
+mysql-db-install.ps1
+
+Executable binary 
+
+windows-authnull-db-agent.exe
+
+Windows Service Name 
+
+AuthnullDBAgent
 
 # Installation on Linux
 ## Install
