@@ -119,9 +119,6 @@ $DbUserName = Read-Host "Enter the user name"
 Write-Host "Enter the database password:" -NoNewline
 $DbPassword = Read-Password 
 
-Write-Host ""
-$ApiKey = Read-Host "Enter the API key"
-
 # Hardcode the mode as 'service'
 #$mode = "service"
 
@@ -134,10 +131,9 @@ $envFileContent = @"
 DB_HOST=$DbHost
 DB_USER=$DbUserName
 DB_PASSWORD=$EscapedPassword
-API_KEY=$ApiKey
 "@
 
-$envFileContent | Set-Content -Path $destinationPath -Force
+$envFileContent | Add-Content -Path $destinationPath -Force
 Write-Host "Database credentials saved to db.env." -ForegroundColor Green
 
 
@@ -153,24 +149,15 @@ Write-Host "Database credentials saved to db.env." -ForegroundColor Green
 #---------------------------------------------------------------------------
 # Create Windows Service
 
-$FinalAgentPath = $OutputPath+"\windows-authnull-db-agent.exe"
-$ServiceName = "AuthNullDbAgent"
-$ServiceDisplayName = "AuthNull Database Agent"
-$ServiceDescription = "A background service for database synchronization."
-$ServiceExecutable = "`"$FinalAgentPath`""
-
-# Remove service if it already exists
-if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
-    Write-Host "Stopping and removing existing service..." -ForegroundColor Yellow
-    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-    sc.exe delete $ServiceName | Out-Null
-    Start-Sleep -Seconds 2
+try {
+    New-Service -Name "AuthNullDBAgent" -BinaryPathName $OutputPath"\windows-authnull-db-agent.exe" 
+    Start-Service AuthNullDBAgent -WarningAction SilentlyContinue
 }
-
-# Create the new Windows service
-sc.exe create $ServiceName binPath= $ServiceExecutable start= auto | Out-Null
-sc.exe description $ServiceName "$ServiceDescription" | Out-Null
-
-# Start the service
-Start-Service -Name $ServiceName
-Write-Host "Service $ServiceDisplayName has been installed and started successfully." -ForegroundColor Green
+catch {
+    Write-Host "Registering AuthNull Agent failed!" -ForegroundColor Red
+}
+finally {
+    # Do this after the try block regardless of whether an exception occurred or not
+}
+Get-Service AuthNullDBAgent
+Write-Host "The path of the agent is " $OutputPath"\windows-authnull-db-agent.exe" -ForegroundColor Yellow
