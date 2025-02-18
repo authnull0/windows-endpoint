@@ -123,16 +123,54 @@ Write-Host ""
 $ApiKey = Read-Host "Enter the API key"
 
 # Hardcode the mode as 'service'
-$mode = "service"
+#$mode = "service"
 
 # Escape the password for command-line compatibility
 $EscapedPassword = "`"$DbPassword`""
 
-# Command to run the Go agent
-$command = "C:\authnull-db-agent\windows-mysql-db-agent.exe --host `"$DbHost`" --username `"$DbUserName`" --password `"$EscapedPassword`" --apikey `"$ApiKey`" --mode `"$mode`""
 
-# Output the command for debugging 
-#Write-Host "Command: $command"
+# Save credentials to db.env file
+$envFileContent = @"
+DB_HOST=$DbHost
+DB_USER=$DbUserName
+DB_PASSWORD=$EscapedPassword
+API_KEY=$ApiKey
+"@
 
-# run the command
-Invoke-Expression $command
+$envFileContent | Set-Content -Path $destinationPath -Force
+Write-Host "Database credentials saved to db.env." -ForegroundColor Green
+
+
+# # Command to run the Go agent
+# $command = "C:\authnull-db-agent\windows-mysql-db-agent.exe --host `"$DbHost`" --username `"$DbUserName`" --password `"$EscapedPassword`" --apikey `"$ApiKey`""
+
+# # Output the command for debugging 
+# #Write-Host "Command: $command"
+
+# # run the command
+# Invoke-Expression $command
+
+#---------------------------------------------------------------------------
+# Create Windows Service
+
+$FinalAgentPath = $OutputPath+"\windows-authnull-db-agent.exe"
+$ServiceName = "AuthNullDbAgent"
+$ServiceDisplayName = "AuthNull Database Agent"
+$ServiceDescription = "A background service for database synchronization."
+$ServiceExecutable = "`"$FinalAgentPath`""
+
+# Remove service if it already exists
+if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+    Write-Host "Stopping and removing existing service..." -ForegroundColor Yellow
+    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+    sc.exe delete $ServiceName | Out-Null
+    Start-Sleep -Seconds 2
+}
+
+# Create the new Windows service
+sc.exe create $ServiceName binPath= $ServiceExecutable start= auto | Out-Null
+sc.exe description $ServiceName "$ServiceDescription" | Out-Null
+
+# Start the service
+Start-Service -Name $ServiceName
+Write-Host "Service $ServiceDisplayName has been installed and started successfully." -ForegroundColor Green
