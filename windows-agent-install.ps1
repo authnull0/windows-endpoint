@@ -606,8 +606,8 @@ $ldapUsername = $credentials.Username
 $ldapPassword = $credentials.Password
 
 #Store the Password in app.env file as PASSWORD
-$envDict["PASSWORD"] = $ldapPassword
-$envDict | ForEach-Object { "$($_.Key)=$($_.Value)" } | Set-Content -Path $envFilePath
+#$envDict["PASSWORD"] = $ldapPassword
+#$envDict | ForEach-Object { "$($_.Key)=$($_.Value)" } | Set-Content -Path $envFilePath
 
 # Log Username and password just for testing
 Write-Host "LDAP Username: $($credentials.Username)"
@@ -659,7 +659,7 @@ foreach ($group in $groups) {
 
     # Check if the local group exists
     try {
-        $localGroupExists = Get-LocalGroup -Name $group -ErrorAction SilentlyContinue
+        $localGroupExists = net localgroup $group | Out-Null
         if ($localGroupExists) {
             Write-Host "Group '$group' exists locally." -ForegroundColor Green
             $groupExists = $true
@@ -676,7 +676,7 @@ foreach ($group in $groups) {
     if ($groupExists) {
         # Add local or domain group to 'Remote Desktop Users' group
         try {
-            Add-LocalGroupMember -Group $RemoteDesktopGroup -Member $group
+            net localgroup "Remote Desktop Users" $group /add
             Write-Host "Successfully added '$group' to the 'Remote Desktop Users' group." -ForegroundColor Green
         }
         catch {
@@ -687,10 +687,10 @@ foreach ($group in $groups) {
         # If group doesn't exist, create it
         Write-Host "Creating the group '$group' locally." -ForegroundColor Yellow
         try {
-            New-LocalGroup -Name $group -Description "Created by script"
+            net localgroup $group /add
             Write-Host "Successfully created local group '$group'." -ForegroundColor Green
             # Add the newly created local group to the Remote Desktop Users group
-            Add-LocalGroupMember -Group $RemoteDesktopGroup -Member $group
+             net localgroup "Remote Desktop Users" $group /add
             Write-Host "Successfully added local group '$group' to the 'Remote Desktop Users' group." -ForegroundColor Green
         }
         catch {
