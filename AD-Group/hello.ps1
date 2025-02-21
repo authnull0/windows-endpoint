@@ -112,16 +112,6 @@ if ($policyDetails.Data.Dit.schedule -and $policyDetails.Data.Dit.schedule.type 
     }
 } else {
     Log-Message "Policy is not time-bound or schedule information is missing. No action taken."
-    #Check the Policy Status and take action accordingly
-    if ($policyDetails.Data.Status -eq "Inactive") {
-        Remove-UserFromGroup -username $username -groupname $groupname
-        #Log-Message "User $username has been removed from group $groupname as the policy is inactive."
-        # End and Delete the Scheduled Task
-        Get-ScheduledTask | Where-Object {$_.TaskName -eq "RemoveUserFromGroup"} | Unregister-ScheduledTask -Confirm:$false
-        Log-Message "Scheduled task 'RemoveUserFromGroup' stopped."
-    } else {
-        Log-Message "Policy is still active. No action taken."
-    }
 }
 
 Log-Message "Script completed."
