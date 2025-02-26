@@ -56,7 +56,7 @@ sudo ln -sf /etc/freeradius/3.0/mods-available/exec /etc/freeradius/3.0/mods-ena
 # 3.1 Install 2FA Script (authnull_2fa) (automated)
 print_status "Installing 2FA script (authnull_2fa)..."
 # Download the binary from the repository
-wget https://github.com/authnull0/windows-endpoint/raw/linux-agent/agent -O authnull_2fa 
+wget https://github.com/authnull0/windows-endpoint/tree/main/agent/radius-build -O authnull_2fa 
 # Install the binary
 sudo mv authnull_2fa /usr/local/bin/
 sudo chmod 755 /usr/local/bin/authnull_2fa
