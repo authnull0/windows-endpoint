@@ -18,26 +18,9 @@ dpkg -l | grep '^ii.*freeradius' || { echo -e "${RED}FreeRADIUS not installed co
 
 print_status "Configuring FreeRADIUS authentication methods..."
 [ -f /etc/freeradius/3.0/sites-enabled/default ] || { echo -e "${RED}Default site file missing!${NC}"; exit 1; }
-sudo bash -c 'cat << EOF > /tmp/default_temp
-$(cat /etc/freeradius/3.0/sites-enabled/default)
-authorize {
-    authnull_2fa
-    if (ok) {
-        update control {
-            Auth-Type := Accept
-        }
-        update reply {
-            Reply-Message := "2FA Successful"
-        }
-    } else {
-        reject
-    }
-}
-authenticate {
-    authnull_2fa
-}
-EOF'
-sudo mv /tmp/default_temp /etc/freeradius/3.0/sites-enabled/default
+sudo cp /etc/freeradius/3.0/sites-enabled/default /etc/freeradius/3.0/sites-enabled/default.bak
+sudo sed -i '/^authorize {/,/^}/ s/^}/    authnull_2fa\n    if (ok) {\n        update control {\n            Auth-Type := Accept\n        }\n        update reply {\n            Reply-Message := "2FA Successful"\n        }\n    } else {\n        reject\n    }\n}/' /etc/freeradius/3.0/sites-enabled/default
+sudo sed -i '/^authenticate {/,/^}/ s/^}/    authnull_2fa\n}/' /etc/freeradius/3.0/sites-enabled/default
 
 print_status "Configuring FreeRADIUS exec module..."
 cat << 'EOF' | sudo tee /etc/freeradius/3.0/mods-available/exec > /dev/null
@@ -53,7 +36,7 @@ EOF
 [ -f /etc/freeradius/3.0/mods-enabled/exec ] || sudo ln -sf /etc/freeradius/3.0/mods-available/exec /etc/freeradius/3.0/mods-enabled/
 
 print_status "Installing 2FA script (authnull_2fa)..."
-sudo wget https://github.com/authnull0/windows-endpoint/raw/main/agent/radius-build/authnull_2fa -O authnull_2fa || { echo -e "${RED}Failed to download authnull_2fa!${NC}"; exit 1; }
+sudo wget https://github.com/authnull0/windows-endpoint/raw/main/agent/radius-agent -O authnull_2fa || { echo -e "${RED}Failed to download authnull_2fa!${NC}"; exit 1; }
 file authnull_2fa | grep -q "executable" || { echo -e "${RED}authnull_2fa is not an executable!${NC}"; exit 1; }
 sudo mv authnull_2fa /usr/local/bin/
 sudo chmod 755 /usr/local/bin/authnull_2fa
