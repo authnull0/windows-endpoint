@@ -1,30 +1,25 @@
 #!/bin/bash
-
-# Exit on any error
 set -e
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-# Function to print status messages
 print_status() {
     echo -e "${GREEN}==> $1${NC}"
 }
 
-# 1. Update the system
 print_status "Updating the system..."
-sudo apt-get update -y
+sudo apt-get update -y || { echo -e "${RED}System update failed!${NC}"; exit 1; }
 
-# 2.1 Install FreeRADIUS
 print_status "Installing FreeRADIUS and required utilities..."
-sudo apt-get install -y freeradius freeradius-utils
-dpkg -l | grep '^ii.*freeradius' || { echo -e "${RED}FreeRADIUS installation failed!${NC}"; exit 1; }
+sudo apt-get install -y freeradius freeradius-utils || { echo -e "${RED}FreeRADIUS installation failed!${NC}"; exit 1; }
+dpkg -l | grep '^ii.*freeradius' || { echo -e "${RED}FreeRADIUS not installed correctly!${NC}"; exit 1; }
 
-# 2.4 Configure Authentication Methods
 print_status "Configuring FreeRADIUS authentication methods..."
-sudo bash -c 'cat << EOF >> /etc/freeradius/3.0/sites-enabled/default
+[ -f /etc/freeradius/3.0/sites-enabled/default ] || { echo -e "${RED}Default site file missing!${NC}"; exit 1; }
+sudo bash -c 'cat << EOF > /tmp/default_temp
+$(cat /etc/freeradius/3.0/sites-enabled/default)
 authorize {
     authnull_2fa
     if (ok) {
@@ -42,8 +37,8 @@ authenticate {
     authnull_2fa
 }
 EOF'
+sudo mv /tmp/default_temp /etc/freeradius/3.0/sites-enabled/default
 
-# 2.5 Configure Exec Section
 print_status "Configuring FreeRADIUS exec module..."
 cat << 'EOF' | sudo tee /etc/freeradius/3.0/mods-available/exec > /dev/null
 exec {
@@ -55,17 +50,15 @@ exec {
     pass_through = yes
 }
 EOF
-sudo ln -sf /etc/freeradius/3.0/mods-available/exec /etc/freeradius/3.0/mods-enabled/
+[ -f /etc/freeradius/3.0/mods-enabled/exec ] || sudo ln -sf /etc/freeradius/3.0/mods-available/exec /etc/freeradius/3.0/mods-enabled/
 
-# 3.1 Install 2FA Script
 print_status "Installing 2FA script (authnull_2fa)..."
-wget https://github.com/authnull0/windows-endpoint/raw/main/agent/radius-build -O authnull_2fa || { echo -e "${RED}Failed to download authnull_2fa!${NC}"; exit 1; }
+sudo wget https://github.com/authnull0/windows-endpoint/raw/main/agent/radius-build -O authnull_2fa || { echo -e "${RED}Failed to download authnull_2fa!${NC}"; exit 1; }
+file authnull_2fa | grep -q "executable" || { echo -e "${RED}authnull_2fa is not an executable!${NC}"; exit 1; }
 sudo mv authnull_2fa /usr/local/bin/
 sudo chmod 755 /usr/local/bin/authnull_2fa
 sudo chown root:root /usr/local/bin/authnull_2fa
-file /usr/local/bin/authnull_2fa | grep -q "executable" || { echo -e "${RED}authnull_2fa is not an executable!${NC}"; exit 1; }
 
-# 3.2 Configure FreeRADIUS 2FA Module
 print_status "Configuring FreeRADIUS 2FA module..."
 cat << 'EOF' | sudo tee /etc/freeradius/3.0/mods-available/authnull_2fa > /dev/null
 exec authnull_2fa {
@@ -83,13 +76,13 @@ exec authnull_2fa {
     output = Reply-Message
 }
 EOF
-sudo ln -sf /etc/freeradius/3.0/mods-available/authnull_2fa /etc/freeradius/3.0/mods-enabled/
+[ -f /etc/freeradius/3.0/mods-enabled/authnull_2fa ] || sudo ln -sf /etc/freeradius/3.0/mods-available/authnull_2fa /etc/freeradius/3.0/mods-enabled/
 
-# 6. Install and configure Fluent Bit
 print_status "Installing and configuring Fluent Bit..."
-curl https://raw.githubusercontent.com/fluent/fluent-bit/master/install.sh | sh || { echo -e "${RED}Fluent Bit installation failed!${NC}"; exit 1; }
-
-# Create parsers.conf
+curl -o fluent-bit-install.sh https://raw.githubusercontent.com/fluent/fluent-bit/master/install.sh || { echo -e "${RED}Failed to download Fluent Bit installer!${NC}"; exit 1; }
+sudo sh fluent-bit-install.sh || { echo -e "${RED}Fluent Bit installation failed!${NC}"; exit 1; }
+rm -f fluent-bit-install.sh
+sudo mkdir -p /etc/fluent-bit/
 cat << 'EOF' | sudo tee /etc/fluent-bit/parsers.conf > /dev/null
 [PARSER]
     Name        json_parser
@@ -97,14 +90,11 @@ cat << 'EOF' | sudo tee /etc/fluent-bit/parsers.conf > /dev/null
     Time_Key    time
     Time_Format %Y-%m-%dT%H:%M:%S
 EOF
-
-# Configure Fluent Bit
 cat << 'EOF' | sudo tee /etc/fluent-bit/fluent-bit.conf > /dev/null
 [SERVICE]
     Flush             1
     Log_Level         debug
     Parsers_File      /etc/fluent-bit/parsers.conf
-
 [INPUT]
     Name              tail
     Path              /var/log/radius_2fa.log
@@ -112,17 +102,14 @@ cat << 'EOF' | sudo tee /etc/fluent-bit/fluent-bit.conf > /dev/null
     Mem_Buf_Limit     5MB
     Read_from_Head    On
     Parser            json_parser
-
 [FILTER]
     Name    grep
     Match   radius_log
     Regex   eventType radius_auth
-
 [OUTPUT]
     Name    stdout
     Match   radius_log
     Format  json
-
 [OUTPUT]
     Name        http
     Match       radius_log
@@ -136,7 +123,6 @@ cat << 'EOF' | sudo tee /etc/fluent-bit/fluent-bit.conf > /dev/null
     Format      json
 EOF
 
-# Test FreeRADIUS config
 print_status "Testing FreeRADIUS configuration..."
 sudo freeradius -C || { echo -e "${RED}FreeRADIUS configuration test failed!${NC}"; exit 1; }
 
