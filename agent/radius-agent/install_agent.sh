@@ -30,7 +30,28 @@ print_status "Configuring FreeRADIUS authentication methods..."
 
 # Add authnull_2fa to authorize and authenticate sections using sed
 # Append `authnull_2fa` at the end of the authorize section
-sudo sed -i '/^authorize {/,/^}/ s/^}/    authnull_2fa\n}/' /etc/freeradius/3.0/sites-enabled/default
+sudo sed -i '/^authorize {/,/^}/ s/^}/    authnull_2fa 
+    if (ok) { 
+
+        update control { 
+
+            Auth-Type := Accept 
+
+        } 
+
+        update reply { 
+
+            Reply-Message := "2FA Successful" 
+
+        } 
+
+    } 
+
+    else { 
+
+        reject 
+
+    } \n}/' /etc/freeradius/3.0/sites-enabled/default
 
 # Append `authnull_2fa` at the end of the authenticate section
 sudo sed -i '/^authenticate {/,/^}/ s/^}/    authnull_2fa\n}/' /etc/freeradius/3.0/sites-enabled/default
