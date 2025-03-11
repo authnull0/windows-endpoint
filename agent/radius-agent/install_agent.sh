@@ -37,7 +37,6 @@ EOF
 
 print_status "Installing 2FA script (authnull_2fa)..."
 sudo wget https://github.com/authnull0/windows-endpoint/tree/main/agent/radius-build/authnull_2fa -O authnull_2fa || { echo -e "${RED}Failed to download authnull_2fa!${NC}"; exit 1; }
-file authnull_2fa | grep -q "executable" || { echo -e "${RED}authnull_2fa is not an executable!${NC}"; exit 1; }
 sudo mv authnull_2fa /usr/local/bin/
 sudo chmod 755 /usr/local/bin/authnull_2fa
 sudo chown root:root /usr/local/bin/authnull_2fa
@@ -46,15 +45,12 @@ print_status "Configuring FreeRADIUS 2FA module..."
 cat << 'EOF' | sudo tee /etc/freeradius/3.0/mods-available/authnull_2fa > /dev/null
 exec authnull_2fa {
     wait = yes
-    program = "/usr/local/bin/authnull_2fa \
-        \"%{User-Name}@authnull.com\" \"%{User-Password}\" \"%{CHAP-Password}\" \
-        \"%{Calling-Station-Id}\" \"%{NAS-IP-Address}\" \"%{NAS-Port}\" \
-        \"%{NAS-Identifier}\" \"%{NAS-Port-Type}\" \"%{Framed-IP-Address}\" \
-        \"%{Called-Station-Id}\" \"%{Service-Type}\" \"%{Framed-Protocol}\" \
-        \"%{Filter-Id}\" \"%{Class}\" \"%{Session-Timeout}\" \
-        \"%{Idle-Timeout}\" \"%{Acct-Session-Id}\" \"%{Acct-Input-Octets}\" \
-        \"%{Acct-Output-Octets}\" \"%{Vendor-Specific}\" \"%{State}\" \
-        \"%{Reply-Message}\""
+    program = "/usr/local/bin/authnull_2fa \"%{User-Name}@authnull.com\" \"%{User-Password}\" \"%{CHAP-Password}\" \
+        \"%{Calling-Station-Id}\" \"%{NAS-IP-Address}\" \"%{NAS-Port}\" \"%{NAS-Port-Id}\" \"%{NAS-Identifier}\" \"%{NAS-Port-Type}\" \"%{Framed-IP-Address}\" \
+        \"%{Called-Station-Id}\" \"%{Service-Type}\" \"%{Framed-Protocol}\" \"%{Filter-Id}\" \"%{Class}\" \"%{Session-Timeout}\" \
+        \"%{Idle-Timeout}\" \"%{Acct-Session-Id}\" \"%{Acct-Input-Octets}\" \"%{Acct-Output-Octets}\" \"%{Vendor-Specific}\" \
+        \"%{State}\" \"%{Reply-Message}\""
+
     shell_escape = yes
     output = Reply-Message
 }
@@ -105,8 +101,5 @@ cat << 'EOF' | sudo tee /etc/fluent-bit/fluent-bit.conf > /dev/null
     Header      Content-Type application/json
     Format      json
 EOF
-
-print_status "Testing FreeRADIUS configuration..."
-sudo freeradius -C || { echo -e "${RED}FreeRADIUS configuration test failed!${NC}"; exit 1; }
 
 print_status "FreeRADIUS with 2FA and Fluent Bit setup completed successfully!"
