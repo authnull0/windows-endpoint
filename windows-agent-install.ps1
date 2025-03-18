@@ -700,68 +700,68 @@ else {
     #-------------------------------------------------------------------------------------
 #Make an API call to Store the Machine Name , IP Address and The Group Names Selected
 # Function to get the machine name and IP address
-function Get-MachineInfo {
-    $machineName = $env:COMPUTERNAME
-    $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Ethernet" | Select-Object -First 1).IPAddress
-    return @{
-        MachineName = $machineName
-        IPAddress = $ipAddress
-    }
-}
+# function Get-MachineInfo {
+#     $machineName = $env:COMPUTERNAME
+#     $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Ethernet" | Select-Object -First 1).IPAddress
+#     return @{
+#         MachineName = $machineName
+#         IPAddress = $ipAddress
+#     }
+# }
 
-# Function to make an API call to store the machine info and selected groups
-function Store-MachineInfo {
-    param (
-        [string]$apiUrl,
-        [hashtable]$machineInfo,
-        [array]$groups,
-        [int]$orgID,
-        [int]$tenantID
-    )
+# # Function to make an API call to store the machine info and selected groups
+# function Store-MachineInfo {
+#     param (
+#         [string]$apiUrl,
+#         [hashtable]$machineInfo,
+#         [array]$groups,
+#         [int]$orgID,
+#         [int]$tenantID
+#     )
 
-    $body = @{
-        endpointName = $machineInfo.MachineName
-        ipAddress = $machineInfo.IPAddress
-        groupNames = $groups
-        orgId = $orgID
-        tenantId = $tenantID
-    } | ConvertTo-Json
+#     $body = @{
+#         endpointName = $machineInfo.MachineName
+#         ipAddress = $machineInfo.IPAddress
+#         groupNames = $groups
+#         orgId = $orgID
+#         tenantId = $tenantID
+#     } | ConvertTo-Json
 
-    try {
-        $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Body $body -ContentType "application/json"
-        Write-Host "API call successful. Response: $response" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "API call failed: $_" -ForegroundColor Red
-        exit
-    }
-}
+#     try {
+#         $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Body $body -ContentType "application/json"
+#         Write-Host "API call successful. Response: $response" -ForegroundColor Green
+#     }
+#     catch {
+#         Write-Host "API call failed: $_" -ForegroundColor Red
+#         exit
+#     }
+# }
 
-# Read environment variables from app.env file
-$envFilePath = "C:\authnull-agent\app.env"
-$envDict = Get-EnvVariables -filePath $envFilePath
+# # Read environment variables from app.env file
+# $envFilePath = "C:\authnull-agent\app.env"
+# $envDict = Get-EnvVariables -filePath $envFilePath
 
-# Get OrgID and TenantID from environment variables and convert to integers
-$orgID = [int]$envDict["ORG_ID"]
-$tenantID = [int]$envDict["TENANT_ID"]
+# # Get OrgID and TenantID from environment variables and convert to integers
+# $orgID = [int]$envDict["ORG_ID"]
+# $tenantID = [int]$envDict["TENANT_ID"]
 
-# Get machine info
-$machineInfo = Get-MachineInfo
+# # Get machine info
+# $machineInfo = Get-MachineInfo
 
-# Read selected groups from the file
-$groups = Get-Content -Path "C:\selected_user_groups.conf"
+# # Read selected groups from the file
+# $groups = Get-Content -Path "C:\selected_user_groups.conf"
 
-# Log the groups for testing purposes
-Write-Host "Selected Groups:"
-foreach ($group in $groups) {
-    Write-Host $group
-}
+# # Log the groups for testing purposes
+# Write-Host "Selected Groups:"
+# foreach ($group in $groups) {
+#     Write-Host $group
+# }
 
-# Define the API URL
-$apiUrl = "https://prod.tenants.authnull.com/addEndpointGroups" # Need to Update this to get from the app.env file-23/01/2025
+# # Define the API URL
+# $apiUrl = "https://prod.tenants.authnull.com/addEndpointGroups" # Need to Update this to get from the app.env file-23/01/2025
 
-# Make the API call to store the machine info and selected groups
-Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -orgID $orgID -tenantID $tenantID 
+# # Make the API call to store the machine info and selected groups
+# Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -orgID $orgID -tenantID $tenantID 
 #-------------------------------------------------------------------------------------
     #modify machine config
     # Define the path to the machine.config file
