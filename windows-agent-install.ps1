@@ -610,8 +610,8 @@ $ldapPassword = $credentials.Password
 #$envDict | ForEach-Object { "$($_.Key)=$($_.Value)" } | Set-Content -Path $envFilePath
 
 # Log Username and password just for testing
-Write-Host "LDAP Username: $($credentials.Username)"
-Write-Host "LDAP Password: $($credentials.Password)"
+# Write-Host "LDAP Username: $($credentials.Username)"
+# Write-Host "LDAP Password: $($credentials.Password)"
 
 # Function to display a prompt for selecting AD groups
 function Select-ADGroups {
