@@ -609,7 +609,7 @@ else {
 # #$envDict["PASSWORD"] = $ldapPassword
 # #$envDict | ForEach-Object { "$($_.Key)=$($_.Value)" } | Set-Content -Path $envFilePath
 
-# # Log Username and password just for testing
+# Log Username and password just for testing
 # Write-Host "LDAP Username: $($credentials.Username)"
 # Write-Host "LDAP Password: $($credentials.Password)"
 
