@@ -13,6 +13,11 @@ cd $HOME/authnull-db-agent
 
 if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
 
+  # Create the log file
+  sudo rm -f /var/log/authnull-db-agent.log
+  sudo touch /var/log/authnull-db-agent.log
+  sudo chmod 666 /var/log/authnull-db-agent.log
+
   rm -rf ./*
   # Download the agent file
   rm -f authnull-db-agent
