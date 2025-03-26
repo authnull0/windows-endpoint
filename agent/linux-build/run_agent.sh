@@ -8,8 +8,10 @@ NC='\033[0m'
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
-mkdir -p $HOME/authnull-db-agent
-cd $HOME/authnull-db-agent
+# Working directory
+dir="/var/opt/authnull-db-agent"
+mkdir -p $dir
+cd $dir
 
 if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
 
@@ -56,16 +58,12 @@ if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
   sudo rm -f run_agent.service
   wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/DATAB-9/agent/linux-build/run_agent.service
-  sed -i "6 i ExecStart=/home/$USER/authnull-db-agent/authnull-db-agent" run_agent.service
-  sed -i "6 i WorkingDirectory=/home/$USER/authnull-db-agent" run_agent.service
-  sed -i "6 i User=$USER" run_agent.service
+  sed -i "6 i ExecStart=$dir/authnull-db-agent" run_agent.service
+  sed -i "6 i WorkingDirectory=$dir" run_agent.service
+  sed -i "6 i User=root" run_agent.service
   sudo mv run_agent.service /etc/systemd/system/
   sudo systemctl enable run_agent.service
 
-  # Add the script to the path
-  echo "# Adding authnull-db-agent to \$PATH" >> "$HOME/.bashrc"
-  echo "export PATH=\$PATH:$HOME/authnull-db-agent" >> "$HOME/.bashrc"
-  source "$HOME/.bashrc"
 fi
 
 # Enable systemd service for the agent
