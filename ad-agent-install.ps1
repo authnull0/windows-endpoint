@@ -209,7 +209,7 @@ $envFileContent | ForEach-Object {
         $value = $_ -replace "ADMFA=", ""
         if ($value -eq "1") {
             # Variables
-            $GitHubURL = "https://raw.githubusercontent.com/authnull0/windows-endpoint/ad-agent/SubAuth.dll"  # Corrected URL of the DLL to download
+            $GitHubURL = "https://raw.githubusercontent.com/authnull0/windows-endpoint/main/SubAuth.dll"  # Corrected URL of the DLL to download
             $DestinationPath = "$env:SystemRoot\System32\SubAuth.dll"  # Destination path for the downloaded DLL
             $RegistryPathLsa = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa"
             $RegistryPathKerberos = "$RegistryPathLsa\Kerberos"
