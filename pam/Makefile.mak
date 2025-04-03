@@ -6,7 +6,7 @@ SSHD_CONFIG=/etc/ssh/sshd_config
 PAM_FILE=/etc/pam.d/sshd
 ENV_FILE=/usr/local/sbin/app.env
 
-install: download copy configure_sshd configure_pam restart_services
+install: download copy configure restart_services
 	@echo "Installation completed successfully."
 
 uninstall: remove_pam restore_sshd restart_services
@@ -22,7 +22,7 @@ copy:
 	sudo cp $(PAM_MODULE) $(PAM_PATH)
 	@if [ $$? -ne 0 ]; then echo "Failed to copy $(PAM_MODULE)." && exit 1; fi
 
-configure_sshd:
+configure:
 	@echo "Configuring $(SSHD_CONFIG)..."
 	sudo sed -i 's/^KbdInteractiveAuthentication no/KbdInteractiveAuthentication yes/' $(SSHD_CONFIG)
 	sudo sed -i 's/^#\?PasswordAuthentication no/PasswordAuthentication yes/' $(SSHD_CONFIG)
@@ -30,7 +30,7 @@ configure_sshd:
 		echo "AuthenticationMethods keyboard-interactive" | sudo tee -a $(SSHD_CONFIG); \
 	fi
 
-configure_pam:
+
 	@if [ ! -f "$(ENV_FILE)" ]; then \
 		echo "Error: $(ENV_FILE) not found!"; exit 1; \
 	fi
@@ -60,4 +60,4 @@ restore_sshd:
 	sudo sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' $(SSHD_CONFIG)
 	sudo sed -i '/AuthenticationMethods keyboard-interactive/d' $(SSHD_CONFIG)
 
-.PHONY: install uninstall download copy configure_sshd configure_pam restart_services remove_pam restore_sshd
+.PHONY: install uninstall download copy configure restart_services remove_pam restore_sshd
