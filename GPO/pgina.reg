@@ -136,15 +136,15 @@ Windows Registry Editor Version 5.00
 [HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins]
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d]
-"AlwaysAuthenticate"="True"
+"AlwaysAuthenticate"="False"
 "AuthzLocalAdminsOnly"="False"
 "AuthzLocalGroupsOnly"="False"
 "AuthzLocalGroups"=hex(7):00,00
 "AuthzApplyToAllUsers"="True"
 "MirrorGroupsForAuthdUsers"="True"
-"GroupCreateFailIsFail"="True"
+"GroupCreateFailIsFail"="False"
 "MandatoryGroups"=hex(7):00,00
-"RemoveProfiles"="False"
+"RemoveProfiles"="True"
 "ScramblePasswords"="False"
 "ScramblePasswordsWhenLMAuthFails"="True"
 "ScramblePasswordsExceptions"=hex(7):00,00
@@ -159,14 +159,6 @@ Windows Registry Editor Version 5.00
 [HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins\350047a0-2d0b-4e24-9f99-16cd18d6b142]
 "ShowDescription"="True"
 "Description"="A RADIUS Authentication and Accounting Plugin"
-
-[HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins\81f8034e-e278-4754-b10c-7066656de5b7]
-"Username"="Username"
-"Domain"="AD-VM-TEST-3"
-"Password"="AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAAFsqFSdiAn0C+flme+E0jwwQAAAACAAAAAAAQZgAAAAEAACAAAABVa+k+XTBaSZmGxiNWUGkSgMjBUsh7JvoQvnV0Knlp4gAAAAAOgAAAAAIAACAAAACKO52zaJEdYZV2HxAC/It2AspRkgRzTOsWR1vDQX8tFxAAAACrN45eAhNO/6s/4w4R/XXFQAAAABk8L90rp/U+KHLIDl6hBuZdsUExJ2udygQeQf9PkWWHKQOd5j08B4+2rWpWBREf1TVmhB0U3fa9bmE1OsxYZDI="
-"RequirePlugins"="False"
-"RequireAllPlugins"="True"
-"RequiredPluginList"=hex(7):00,00
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\pGina3\Plugins\98477b3a-830d-4bee-b270-2d7435275f9c]
 "ShowDescription"="True"
