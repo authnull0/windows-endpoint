@@ -52,7 +52,9 @@ fi
 echo "SSHD config configured. Check the logs with: tail -f /var/log/auth.log (Ubuntu) or tail -f /var/log/secure (CentOS)"
 
 # Restart SSH Service
-sudo systemctl restart sshd
+sudo systemctl restart sshd 2>/dev/null || true
+sudo systemctl restart ssh 2>/dev/null || true
+
 
 # Log the SSH service restart status
 echo "SSH service restart attempted. Check the logs with: tail -f /var/log/auth.log (Ubuntu) or tail -f /var/log/secure (CentOS)"
