@@ -126,7 +126,7 @@ else {
 
 #-------------------------------------------------------------------------------------
 # Define the URL of the file to download
-$url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/main.zip"
+$url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/pgina-script-fix.zip"
 
 try {
     $webClient = New-Object System.Net.WebClient
@@ -915,12 +915,23 @@ else {
     #---------------------------------------------------------------------
     Write-Host "Configuring pgina for user authentication" -ForegroundColor Green
     # Define the path to your registry file
-    $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina.reg"
+    if($userType == "Local"){
+         $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina_local.reg"
+    } 
+    elseif ($userType == "Ldap"){
+        $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina_ldap.reg"
+   } 
+   else {
+    $userType = "LDAP and Local"
+    $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina_ldap.reg"
+    }  
+   
 
     # Check if the file exists
     try {
         if (Test-Path $registryFilePath) {
             # Import the registry file using regedit
+            Write-Host "Updating Registry Values for $userType user"
             Start-Process -FilePath "regedit.exe" -ArgumentList "/s `"$registryFilePath`"" -Wait
 
             # Optionally, check if the import was successful
