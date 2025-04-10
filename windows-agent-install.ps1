@@ -1008,7 +1008,7 @@ else {
         Set-ItemProperty -Path $registryKeyPath -Name $expectedKeys[$key] -Value $value -Force 
     }
 
-    Write-Host "Configured LDAP Plugins Successfully.." -ForegroundColor Green
+    #Write-Host "Configured LDAP Plugins Successfully.." -ForegroundColor Green
     Write-Host "Restart your system to apply the changes.." -ForegroundColor Green
 
 
