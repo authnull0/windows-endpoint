@@ -991,6 +991,7 @@ else {
 
     # Loop through the expected keys and update the registry
     foreach ($key in $expectedKeys.Keys) {
+        $value = $null  # Clear previous value
         if ($envDict.ContainsKey($key)) {
        
             $value = $envDict[$key]
