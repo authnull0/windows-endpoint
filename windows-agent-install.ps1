@@ -915,17 +915,18 @@ else {
     #---------------------------------------------------------------------
     Write-Host "Configuring pgina for user authentication" -ForegroundColor Green
     # Define the path to your registry file
-    if($userType == "Local"){
-         $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina_local.reg"
+    if ($envDict["USER_TYPE"] -eq "Local") {
+        $userType = "Local"
+        $registryFilePath = "$OutputPath\windows-endpoint-main\gpo\pgina_local.reg"
     } 
-    elseif ($userType == "Ldap"){
-        $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina_ldap.reg"
-   } 
-   else {
-    $userType = "LDAP and Local"
-    $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina_ldap.reg"
-    }  
-   
+    elseif ($envDict["USER_TYPE"] -eq "Ldap") {
+        $userType = "Ldap"
+        $registryFilePath = "$OutputPath\windows-endpoint-main\gpo\pgina_ldap.reg"
+    } 
+    else {
+        $userType = "LDAP and Local"
+        $registryFilePath = "$OutputPath\windows-endpoint-main\gpo\pgina_ldap.reg"
+    }
 
     # Check if the file exists
     try {
