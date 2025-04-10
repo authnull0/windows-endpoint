@@ -913,7 +913,7 @@ else {
     }           
     
     #---------------------------------------------------------------------
-    Write-Host "Configuring pgina for both local user and AD user authentication" -ForegroundColor Green
+    Write-Host "Configuring pgina for user authentication" -ForegroundColor Green
     # Define the path to your registry file
     $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina.reg"
 
@@ -940,7 +940,7 @@ else {
     Write-Host "Local Admin Fallback registry added successfully.." -ForegroundColor Green
     #--------------------------------------------------------------------------------
 
-    Write-Host "LDAP Plugin Settings" -ForegroundColor Green
+    #Write-Host "LDAP Plugin Settings" -ForegroundColor Green
     $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\ldap.reg"
     try {
         # Check if the file exists
@@ -995,10 +995,10 @@ else {
        
             $value = $envDict[$key]
         }
-        else {
+        # else {
         
-            $value = Read-Host "Enter value for $key"
-        }
+        #     $value = Read-Host "Enter value for $key"
+        # }
     
         if ($key -eq "LDAP_PORT") {
             # $value = "{0:x}" -f [int]$value
