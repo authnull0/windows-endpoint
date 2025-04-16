@@ -1,101 +1,78 @@
-#Agentless configuration script to download SubAuth.dll
-
+# Path to configuration file
 $destinationPath = "C:\authnull-ad-agent\agent.conf"
-
-$envFileContent = Get-Content -Path $destinationPath
-
-# Check if the env file exists
+ 
+# Check if the config file exists
 if (-not (Test-Path -Path $destinationPath)) {
-    Write-Host "The env file does not exist at path: $destinationPath" -ForegroundColor Red
+    Write-Host "The config file does not exist at: $destinationPath" -ForegroundColor Red
     exit
 }
-
-# Read the content of the env file
+ 
+# Read config file contents
 try {
     $envFileContent = Get-Content -Path $destinationPath
-    Write-Host "Successfully read the env file." -ForegroundColor Green
-}
-catch {
-    Write-Host "Failed to read the env file: $_" -ForegroundColor Red
+    Write-Host "Successfully read the config file." -ForegroundColor Green
+} catch {
+    Write-Host "Failed to read the config file: $_" -ForegroundColor Red
     exit
 }
-
-# Process each line in the env file
+ 
+# Look for ADMFA=1 in the config
+$admfaEnabled = $false
 $envFileContent | ForEach-Object {
-    if ($_ -match "ADMFA") {
-        $value = $_ -replace "ADMFA=", ""
-        if ($value -eq "1") {
-            # Variables
-            $GitHubURL = "https://raw.githubusercontent.com/authnull0/windows-endpoint/main/SubAuth.dll"  # Corrected URL of the DLL to download
-            $DestinationPath = "$env:SystemRoot\System32\SubAuth.dll"  # Destination path for the downloaded DLL
-            $RegistryPathLsa = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa"
-            $RegistryPathKerberos = "$RegistryPathLsa\Kerberos"
-            $DllName = "SubAuth"
-            $SubAuthValueName = "Auth0"  # The name of the sub-authentication package in Kerberos
-
-            # Step 1: Download DLL from GitHub and place it in System32
-            try {
-                Write-Host "Downloading DLL from $GitHubURL..."
-                Invoke-WebRequest -Uri $GitHubURL -OutFile $DestinationPath -UseBasicParsing
-                Write-Host "DLL downloaded and placed in $DestinationPath"
-            }
-            catch {
-                Write-Host "Error downloading the DLL: $_" -ForegroundColor Red
-                exit
-            }
-
-            # Step 2: Modify the Kerberos registry key to add the DLL
-            try {
-                # Check if the Kerberos registry key exists and create it if necessary
-                if (-not (Test-Path $RegistryPathKerberos)) {
-                    New-Item -Path $RegistryPathKerberos -Force
-                }
-
-                # Add the DLL to the Kerberos "Auth0" sub-authentication package value
-                $KerberosPackages = Get-ItemProperty -Path $RegistryPathKerberos -Name $SubAuthValueName -ErrorAction SilentlyContinue
-                if ($KerberosPackages) {
-                    Write-Host "Current Kerberos packages: $($KerberosPackages.$SubAuthValueName)" -ForegroundColor Yellow
-                    if ($KerberosPackages.$SubAuthValueName -notcontains $DllName) {
-                        Write-Host "Appending $DllName to the existing Kerberos authentication packages..."
-                        $NewKerberosPackages = $KerberosPackages.$SubAuthValueName + "," + $DllName
-                        Set-ItemProperty -Path $RegistryPathKerberos -Name $SubAuthValueName -Value $NewKerberosPackages
-                        Write-Host "New Kerberos packages: $NewKerberosPackages" -ForegroundColor Yellow
-                    }
-                    else {
-                        Write-Host "$DllName already exists in Kerberos authentication packages."
-                    }
-                }
-                else {
-                    # Create the value if it doesn't exist
-                    Write-Host "Creating new Kerberos authentication packages registry value..."
-                    Set-ItemProperty -Path $RegistryPathKerberos -Name $SubAuthValueName -Value $DllName
-                    Write-Host "New Kerberos packages: $DllName" -ForegroundColor Yellow
-                }
-
-                Write-Host "Successfully modified the Kerberos registry."
-            }
-            catch {
-                Write-Host "Error modifying the Kerberos registry: $_" -ForegroundColor Red
-                exit
-            }
-
-            # Final step: Notify the user to restart the machine
-            #Write-Host "You may need to restart the system for changes to take effect."
-        }
-        else {
-            Write-Host "ADMFA is set to false. No further action is required."
-            exit
-        }
+    if ($_ -match "^ADMFA\s*=\s*1") {
+        $admfaEnabled = $true
     }
 }
-
-#Restart Computer
+ 
+if (-not $admfaEnabled) {
+    Write-Host "ADMFA is not enabled. Exiting script." -ForegroundColor Yellow
+    exit
+}
+ 
+# Variables
+$GitHubURL = "https://raw.githubusercontent.com/authnull0/windows-endpoint/main/SubAuth.dll"
+$DestinationPath = "$env:SystemRoot\System32\SubAuth.dll"
+$RegistryPathMsv1 = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0"
+$DllName = "SubAuth"
+$SubAuthValueName = "Auth0"
+ 
+# Download SubAuth.dll
 try {
-    Write-Host "Waiting for 10 seconds before restarting..." -ForegroundColor Yellow
+    Write-Host "Downloading SubAuth.dll from $GitHubURL..." -ForegroundColor Cyan
+    Invoke-WebRequest -Uri $GitHubURL -OutFile $DestinationPath -UseBasicParsing
+    Write-Host "SubAuth.dll successfully downloaded to $DestinationPath" -ForegroundColor Green
+} catch {
+    Write-Host "Error downloading SubAuth.dll: $_" -ForegroundColor Red
+    exit
+}
+ 
+# Modify MSV1_0 registry key
+try {
+    if (-not (Test-Path $RegistryPathMsv1)) {
+        Write-Host "MSV1_0 registry path does not exist. Creating it..." -ForegroundColor Yellow
+        New-Item -Path $RegistryPathMsv1 -Force
+    }
+ 
+    $existingAuth = Get-ItemProperty -Path $RegistryPathMsv1 -Name $SubAuthValueName -ErrorAction SilentlyContinue
+ 
+    if ($existingAuth) {
+        Write-Host "$SubAuthValueName already set to: $($existingAuth.$SubAuthValueName)" -ForegroundColor Yellow
+    } else {
+        Write-Host "Creating $SubAuthValueName and assigning value '$DllName'..." -ForegroundColor Cyan
+        New-ItemProperty -Path $RegistryPathMsv1 -Name $SubAuthValueName -PropertyType String -Value $DllName -Force
+        Write-Host "$SubAuthValueName successfully created and set." -ForegroundColor Green
+    }
+} catch {
+    Write-Host "Error modifying MSV1_0 registry key: $_" -ForegroundColor Red
+    exit
+}
+ 
+# Prompt restart
+try {
+    Write-Host "`nSystem will restart in 10 seconds to apply changes..." -ForegroundColor Cyan
     Start-Sleep -Seconds 10
     Restart-Computer -Force
+} catch {
+    Write-Host "Error restarting the system: $_" -ForegroundColor Red
+    exit
 }
-catch {
-    Write-Host "Restarting computer failed: $_" -ForegroundColor Red
-}
-
