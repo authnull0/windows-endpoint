@@ -938,8 +938,8 @@ else {
     #Setting LocalAdminFallback Registry 
     set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
     Write-Host "Local Admin Fallback registry added successfully.." -ForegroundColor Green
+    
     #--------------------------------------------------------------------------------
-
     #Write-Host "LDAP Plugin Settings" -ForegroundColor Green
     $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\ldap.reg"
     try {
@@ -1009,9 +1009,49 @@ else {
         Set-ItemProperty -Path $registryKeyPath -Name $expectedKeys[$key] -Value $value -Force 
     }
 
-    #Write-Host "Configured LDAP Plugins Successfully.." -ForegroundColor Green
-    Write-Host "Restart your system to apply the changes.." -ForegroundColor Green
+    # Paths
+    $imagePath = "C:\authnull-agent"
 
+    if (-not [string]::IsNullOrWhiteSpace($imageUrl)) {
+    # Read IMAGE_URL from app.env
+    $imageUrlLine = Get-Content -Path $envFilePath | Where-Object { $_ -match "^IMAGE_URL=" }
+    $imageUrl = $imageUrlLine -replace "^IMAGE_URL=", ""
+    $imageUrl = $imageUrl.Trim()
+
+    # Continue only if imageUrl is valid
+    $tempImagePath = Join-Path $imagePath "temp_tile_image.png"
+    $bmpImagePath = Join-Path $imagePath "tile_image.bmp"
+
+    # Download image
+    Invoke-WebRequest -Uri $imageUrl -OutFile $tempImagePath
+
+    # Load and convert image with white background
+    Add-Type -AssemblyName System.Drawing
+
+    $originalImage = [System.Drawing.Image]::FromFile($tempImagePath)
+
+    # Create new blank bitmap with white background
+    $bitmap = New-Object System.Drawing.Bitmap $originalImage.Width, $originalImage.Height
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    $graphics.Clear([System.Drawing.Color]::White)
+    $graphics.DrawImage($originalImage, 0, 0, $originalImage.Width, $originalImage.Height)
+
+    # Save as BMP
+    $bitmap.Save($bmpImagePath, [System.Drawing.Imaging.ImageFormat]::Bmp)
+
+    # Cleanup
+    $graphics.Dispose()
+    $originalImage.Dispose()
+    $bitmap.Dispose()
+    Remove-Item $tempImagePath -Force
+
+    # Set registry key to BMP
+    Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "TileImage" -Value $bmpImagePath -Type String -Force -Verbose
+    } else{
+        Write-Host "No IMAGE_URL found in app.env. Skipping image processing." -ForegroundColor Green
+        Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "TileImage" -Value "" -Type String -Force -Verbose
+        Write-Host "Default PGINA Logo will take over Logon Screen" -ForegroundColor Green
+    }
 
     #------------------------------------------------------------------------------------------------------------------------------------
     #Restart Computer
