@@ -126,7 +126,7 @@ else {
 
 #-------------------------------------------------------------------------------------
 # Define the URL of the file to download
-$url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/main.zip"
+$url = "https://github.com/authnull0/windows-endpoint/raw/refs/heads/main/windows-agent.zip"
 
 try {
     $webClient = New-Object System.Net.WebClient
@@ -227,24 +227,24 @@ else {
 #---------------------------------------------------------------------------
 Write-Host "Extracting agent" -ForegroundColor Yellow
 
-$AgentPath = $OutputPath + "\windows-endpoint-main\agent\windows-build.zip"
+# $AgentPath = $OutputPath + "\windows-agent\windows-build.zip"
 
-if (Test-Path $AgentPath) {
-    # Extract the file
-    try {
-        Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
-        Write-Host "Extraction completed successfully." -ForegroundColor Green
-    }
-    catch {
-        Write-Host "Extraction failed: $_" -ForegroundColor Red
-    }
-} 
-else {
-    Write-Host "Zip file not found at: $zipFilePath" -ForegroundColor Red
-}
+# if (Test-Path $AgentPath) {
+#     # Extract the file
+#     try {
+#         Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
+#         Write-Host "Extraction completed successfully." -ForegroundColor Green
+#     }
+#     catch {
+#         Write-Host "Extraction failed: $_" -ForegroundColor Red
+#     }
+# } 
+# else {
+#     Write-Host "Zip file not found at: $zipFilePath" -ForegroundColor Red
+# }
 
 #reusing agent path
-$AgentPath = $OutputPath + "\windows-endpoint-main\agent\windows-build\windows-agent-amd64.exe"
+$AgentPath = $OutputPath + "\windows-agent\windows-build\windows-agent-amd64.exe"
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
 
 
@@ -376,7 +376,7 @@ if ($envDict["ADMFA"] -eq "1") {
 else {
 
     #Installing Microsoft Visual C++     
-    $InstallPath = $OutputPath + "\windows-endpoint-main\credential-provider\pgina\vcRedist_x64.exe"  
+    $InstallPath = $OutputPath + "\windows-agent\credential-provider\pgina\vcRedist_x64.exe"  
 
     # Check if Visual C++ Redistributable is installed
     $vcRedistKey = "HKLM:\SOFTWARE\Wow6432Node\Microsoft\VisualStudio\11.0\VC\Runtimes\x64" 
@@ -411,7 +411,7 @@ else {
 
 
 
-    $InstallPath = $OutputPath + "\windows-endpoint-main\credential-provider\pgina\vcredist_x86.exe"  
+    $InstallPath = $OutputPath + "\windows-agent\credential-provider\pgina\vcredist_x86.exe"  
 
     # Check if Visual C++ Redistributable is installed
     $vcRedistKey = "HKLM:\SOFTWARE\Wow6432Node\Microsoft\VisualStudio\11.0\VC\Runtimes\x86"  
@@ -447,7 +447,7 @@ else {
 
 
     #Installing pGina
-    $InstallerPath = $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+    $InstallerPath = $OutputPath + "\windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 
     if (-not $InstallerPath) {
         Write-Host "Installation path does not exist" -ForegroundColor Yellow
@@ -456,7 +456,7 @@ else {
     # Check if the installer executable exists
     if (Test-Path $InstallerPath) {
         #Installing pGina
-        $InstallerPath = $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+        $InstallerPath = $OutputPath + "\windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
         Write-Host "Please close the pGina after installation.." -ForegroundColor Green
         if (-not $InstallerPath) {
             Write-Host "Installation path does not exist" -ForegroundColor Yellow
@@ -814,7 +814,7 @@ else {
     #copy plugins 
 
     # Define the source directory path
-    $sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\plugins" 
+    $sourceDirectory = $OutputPath + "\windows-agent\credential-provider\plugins" 
 
     # Define the destination directory path
     Write-Host "Copying plugins... please wait" -ForegroundColor Yellow
@@ -840,7 +840,7 @@ else {
     #-------------------------------------------------------------------------------------
     #copy depedency dlls
     Write-Host "Copying dependencies .." -ForegroundColor Green
-    $sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\dll-dependencies" 
+    $sourceDirectory = $OutputPath + "\windows-agent\credential-provider\dll-dependencies" 
     $destinationDirectory = "C:\Windows\System32" 
 
     Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
@@ -849,8 +849,8 @@ else {
     #--------------------------------------------------------------------------
     #updating group policy to enable and disable respective credential providers
 
-    $lgpoPath = $OutputPath + "\windows-endpoint-main\gpo\LGPO.exe"
-    $backupFolder = $OutputPath + "\windows-endpoint-main\gpo\registry.pol"
+    $lgpoPath = $OutputPath + "\windows-agent\gpo\LGPO.exe"
+    $backupFolder = $OutputPath + "\windows-agenr\gpo\registry.pol"
     #$infFilePath = $OutputPath + "\windows-endpoint-main\gpo\security.inf"
     
     # try {
@@ -915,7 +915,7 @@ else {
     #---------------------------------------------------------------------
     Write-Host "Configuring pgina for user authentication" -ForegroundColor Green
     # Define the path to your registry file
-    $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina.reg"
+    $registryFilePath = $OutputPath + "\windows-agent\gpo\pgina.reg"
 
     # Check if the file exists
     try {
@@ -938,10 +938,14 @@ else {
     #Setting LocalAdminFallback Registry 
     set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
     Write-Host "Local Admin Fallback registry added successfully.." -ForegroundColor Green
-    
+
+    #Disabling Pgina Version in logon screen
+    Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "EnableMotd" -Value "False" -Type String -Force -Verbose
+    Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "Motd" -Value "" -Type String -Force -Verbose
+
     #--------------------------------------------------------------------------------
     #Write-Host "LDAP Plugin Settings" -ForegroundColor Green
-    $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\ldap.reg"
+    $registryFilePath = $OutputPath + "\windows-agent\gpo\ldap.reg"
     try {
         # Check if the file exists
         if (Test-Path $registryFilePath) {
@@ -1011,13 +1015,14 @@ else {
 
     # Paths
     $imagePath = "C:\authnull-agent"
-
-    if (-not [string]::IsNullOrWhiteSpace($imageUrl)) {
-    # Read IMAGE_URL from app.env
+     # Read IMAGE_URL from app.env
     $imageUrlLine = Get-Content -Path $envFilePath | Where-Object { $_ -match "^IMAGE_URL=" }
     $imageUrl = $imageUrlLine -replace "^IMAGE_URL=", ""
     $imageUrl = $imageUrl.Trim()
 
+    
+    if (-not [string]::IsNullOrWhiteSpace($imageUrl)) {
+   
     # Continue only if imageUrl is valid
     $tempImagePath = Join-Path $imagePath "temp_tile_image.png"
     $bmpImagePath = Join-Path $imagePath "tile_image.bmp"
@@ -1047,6 +1052,8 @@ else {
 
     # Set registry key to BMP
     Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "TileImage" -Value $bmpImagePath -Type String -Force -Verbose
+    Write-Host "Applying tenant-specific logo to the Windows login screen..." -ForegroundColor Green
+    
     } else{
         Write-Host "No IMAGE_URL found in app.env. Skipping image processing." -ForegroundColor Green
         Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "TileImage" -Value "" -Type String -Force -Verbose
