@@ -850,7 +850,7 @@ else {
     #updating group policy to enable and disable respective credential providers
 
     $lgpoPath = $OutputPath + "\windows-agent\gpo\LGPO.exe"
-    $backupFolder = $OutputPath + "\windows-agenr\gpo\registry.pol"
+    $backupFolder = $OutputPath + "\windows-agent\gpo\registry.pol"
     #$infFilePath = $OutputPath + "\windows-endpoint-main\gpo\security.inf"
     
     # try {
