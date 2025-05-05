@@ -1,5 +1,42 @@
 #!/bin/bash
 
+# Check if curl is installed
+if command -v curl >/dev/null 2>&1; then
+    echo "curl is already installed."
+else
+    read -p "curl is not installed. Do you want to install it? (y/n): " user_input
+    if [[ "$user_input" != "y" && "$user_input" != "Y" ]]; then
+        echo "Installation aborted by user."
+        exit 1
+    fi
+
+    # Detect package manager and install curl
+    if command -v apt >/dev/null 2>&1; then
+        echo "Detected apt-based system. Installing curl..."
+        sudo apt update && sudo apt install -y curl
+    elif command -v dnf >/dev/null 2>&1; then
+        echo "Detected dnf-based system. Installing curl..."
+        sudo dnf install -y curl
+    elif command -v yum >/dev/null 2>&1; then
+        echo "Detected yum-based system. Installing curl..."
+        sudo yum install -y curl
+    elif command -v zypper >/dev/null 2>&1; then
+        echo "Detected zypper-based system. Installing curl..."
+        sudo zypper install -y curl
+    else
+        echo "Unsupported Linux distribution or package manager not found."
+        exit 1
+    fi
+
+    # Verify installation
+    if command -v curl >/dev/null 2>&1; then
+        echo "curl was successfully installed."
+    else
+        echo "Failed to install curl."
+        exit 1
+    fi
+fi
+
 # Download Files
 sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/pam_google_authenticator.so
 sudo wget -P /tmp https://github.com/authnull0/windows-endpoint/raw/google-authenticator-pam/pam/did.sh
