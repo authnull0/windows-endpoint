@@ -58,49 +58,5 @@ exec authnull_2fa {
 EOF
 [ -f /etc/freeradius/3.0/mods-enabled/authnull_2fa ] || sudo ln -sf /etc/freeradius/3.0/mods-available/authnull_2fa /etc/freeradius/3.0/mods-enabled/
 
-print_status "Installing and configuring Fluent Bit..."
-curl -o fluent-bit-install.sh https://raw.githubusercontent.com/fluent/fluent-bit/master/install.sh || { echo -e "${RED}Failed to download Fluent Bit installer!${NC}"; exit 1; }
-sudo sh fluent-bit-install.sh || { echo -e "${RED}Fluent Bit installation failed!${NC}"; exit 1; }
-rm -f fluent-bit-install.sh
-sudo mkdir -p /etc/fluent-bit/
-cat << 'EOF' | sudo tee /etc/fluent-bit/parsers.conf > /dev/null
-[PARSER]
-    Name        json_parser
-    Format      json
-    Time_Key    time
-    Time_Format %Y-%m-%dT%H:%M:%S
-EOF
-cat << 'EOF' | sudo tee /etc/fluent-bit/fluent-bit.conf > /dev/null
-[SERVICE]
-    Flush             1
-    Log_Level         debug
-    Parsers_File      /etc/fluent-bit/parsers.conf
-[INPUT]
-    Name              tail
-    Path              /var/log/radius_2fa.log
-    Tag               radius_log
-    Mem_Buf_Limit     5MB
-    Read_from_Head    On
-    Parser            json_parser
-[FILTER]
-    Name    grep
-    Match   radius_log
-    Regex   eventType radius_auth
-[OUTPUT]
-    Name    stdout
-    Match   radius_log
-    Format  json
-[OUTPUT]
-    Name        http
-    Match       radius_log
-    Host        monitoring.authnull.com
-    Port        443
-    URI         /
-    tls         on
-    tls.verify  on
-    Retry_Limit false
-    Header      Content-Type application/json
-    Format      json
-EOF
 
-print_status "FreeRADIUS with 2FA and Fluent Bit setup completed successfully!"
+print_status "FreeRADIUS with 2FA setup completed successfully!"
