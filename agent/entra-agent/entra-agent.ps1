@@ -1,155 +1,99 @@
 param (
-    [string]$OutputPath
+    [string]$DownloadDir = "C:\temp\entra-download",
+    [string]$InstallDir = "C:\EntraSyncAgent",
+    [string]$RarUrl = "https://raw.githubusercontent.com/authnull0/windows-endpoint/linux-testing/entra-agent.rar"
 )
 
-# Check if the output path parameter is provided
-if (-not $OutputPath) {
-    Write-Host "Please provide the path where you want to save the downloaded file using the -OutputPath parameter." -ForegroundColor Yellow
-    exit
-}
+$serviceName = "EntraSyncAgent"
 
-# Check if the output directory exists; if not, create it
-if (-not (Test-Path -Path $OutputPath -PathType Container)) {
-    try {
-        New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
-        Write-Host "Created directory: $OutputPath" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "Failed to create directory: $_" -ForegroundColor Red
-        exit
-    }
-}
-else {
-    Write-Host "Output directory already exists...downloading now" -ForegroundColor Yellow
-}
-
-# Define the URL of the file to download
-$url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/entra-agent.zip"
-
-# Download the file
+# ---------------- STEP 1: Stop and delete existing service ----------------
+Write-Host "Stopping and removing service '$serviceName' (if exists)..." -ForegroundColor Yellow
 try {
-    $webClient = New-Object System.Net.WebClient
-    $webClient.DownloadFile($url, "$OutputPath\entra-agent.zip")
-    Write-Host "Download completed successfully." -ForegroundColor Green
-}
-catch {
-    Write-Host "Download failed: $_" -ForegroundColor Red
-    exit
+    Stop-Service -Name $serviceName -ErrorAction SilentlyContinue
+    sc.exe delete $serviceName | Out-Null
+} catch {
+    Write-Host "Service not found or could not be deleted (may already be gone)." -ForegroundColor DarkYellow
 }
 
-if (Test-Path "$OutputPath\entra-agent.zip") {
-    # Extract the file
-    try {
-        Expand-Archive -Path "$OutputPath\entra-agent.zip" -DestinationPath $OutputPath -Force
-        Write-Host "Extraction completed successfully." -ForegroundColor Green
-    }
-    catch {
-        Write-Host "Extraction failed: $_" -ForegroundColor Red
-    }
-}
-else {
-    Write-Host "Zip file not found at: $OutputPath\entra-agent.zip" -ForegroundColor Red
-}
 
-# Create folder C:\authnull-agent
-$FolderPath = "C:\authnull-agent"
-if (-not (Test-Path -Path $FolderPath -PathType Container)) {
-    try {
-        New-Item -Path $FolderPath -ItemType Directory -Force | Out-Null
-        Write-Host "Created directory: $FolderPath" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "Failed to create directory: $_" -ForegroundColor Red
-        exit
-    }
+
+# ---------------- STEP 3: Download entra-agent.rar ----------------
+if (-not (Test-Path $DownloadDir)) {
+    New-Item -Path $DownloadDir -ItemType Directory -Force | Out-Null
 }
-else {
-    Write-Host "Folder already exists.." -ForegroundColor Yellow
+$rarPath = Join-Path $DownloadDir "entra-agent.rar"
+if (-not (Test-Path $rarPath)) {
+    Write-Host "Downloading entra-agent.rar..." -ForegroundColor Cyan
+    Invoke-WebRequest -Uri $RarUrl -OutFile $rarPath
+    Write-Host "Downloaded to: $rarPath" -ForegroundColor Green
+} else {
+    Write-Host "RAR already exists. Skipping download." -ForegroundColor Yellow
 }
 
-# Copy publish folder
-$sourceDirectory = $OutputPath + "\windows-endpoint-entra-agent\agent\entra-agent-build" # Updated path
-Copy-Item -Path "$sourceDirectory\*" -Destination $FolderPath -Recurse -Force -Verbose
-Write-Host "Copied files successfully to the publish folder.." -ForegroundColor Green
+# ---------------- STEP 4: Extract entra-agent.rar ----------------
+$sevenZip = "C:\Program Files\7-Zip\7z.exe"
+$winrar = "C:\Program Files\WinRAR\winrar.exe"
+$extracted = $false
 
-# #updating group policy to enable and disable respective credential providers
-
-# $lgpoPath = $OutputPath + "\windows-endpoint-entra-agent\gpo\LGPO.exe"
-
-# $infFilePath = $OutputPath + "\windows-endpoint-entra-agent\gpo\security.inf"
-    
-# try {
-#     Start-Process -FilePath $lgpoPath -ArgumentList "/s $infFilePath"
-#     Write-Host "Security settings installed successfully." -ForegroundColor Green
-
-#     # Run gpupdate /force to refresh policies
-#     Write-Host "Refreshing Group Policy settings..." -ForegroundColor Yellow
-#     Start-Process -FilePath "gpupdate" -ArgumentList "/force" -Wait
-#     Write-Host "Group Policy updated successfully." -ForegroundColor Green
-# } 
-# catch {
-#     Write-Host "Security setting installation failed : $_" -ForegroundColor Red
-# }
-
-# Define paths
-$BackupDirectory = "C:\Backup\SecurityPolicies"
-$BackupFile = "$BackupDirectory\security.inf"
-$ModifiedFile = "$BackupDirectory\modified_security.inf"
-$LogFile = "$BackupDirectory\secedit.log"
-
-# Ensure the backup directory exists
-if (-not (Test-Path $BackupDirectory)) {
-    New-Item -ItemType Directory -Path $BackupDirectory -Force | Out-Null
+if (-not (Test-Path $InstallDir)) {
+    New-Item -Path $InstallDir -ItemType Directory -Force | Out-Null
 }
 
+if (Get-Command "7z.exe" -ErrorAction SilentlyContinue) {
+    & 7z.exe x $rarPath -o"$InstallDir" -y
+    $extracted = $true
+} elseif (Test-Path $sevenZip) {
+    & "$sevenZip" x $rarPath -o"$InstallDir" -y
+    $extracted = $true
+} elseif (Test-Path $winrar) {
+    & "$winrar" x $rarPath "$InstallDir\"
+    $extracted = $true
+} else {
+    Write-Host " Could not find 7-Zip or WinRAR. Please install one of them." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Extraction complete." -ForegroundColor Green
+
+# ---------------- STEP 5: Prompt for client_secret ----------------
+$clientSecret = Read-Host "Enter your Entra Client Secret"
+$yamlPath = Join-Path $InstallDir "entra-credentials.yaml"
+$deltaPath = Join-Path $InstallDir "delta_link.txt"
+$yaml = @"
+client_secret: $clientSecret
+sync_interval_seconds: 3600
+delta_link_file: $deltaPath
+"@
+$yaml | Out-File -FilePath $yamlPath -Encoding utf8
+Write-Host "Created entra-credentials.yaml" -ForegroundColor Green
+
+# ---------------- STEP 6: Validate app.env ----------------
+$envPath = Join-Path $InstallDir "app.env"
+if (-not (Test-Path $envPath)) {
+    Write-Host " Missing required app.env in $InstallDir. Please place it before continuing." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Found app.env, continuing." -ForegroundColor Green
+
+# ---------------- STEP 7: Find binary and install service ----------------
+$exePath = Get-ChildItem -Path $InstallDir -Recurse -Filter "entra-sync-agent.exe" | Select-Object -First 1
+if (-not $exePath) {
+    Write-Host " entra-sync-agent.exe not found in extracted files." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Installing service via entra-sync-agent.exe..." -ForegroundColor Cyan
+& $exePath.FullName install
+
+Start-Sleep -Seconds 2
+
+# ---------------- STEP 8: Start service ----------------
 try {
-    # Step 1: Export the current security policy
-    Write-Host "Exporting current security policy..." -ForegroundColor Yellow
-    secedit /export /cfg $BackupFile /log $LogFile
-    Write-Host "Exported security policy to $BackupFile" -ForegroundColor Green
-
-    # Step 2: Modify the PasswordComplexity setting
-    Write-Host "Modifying PasswordComplexity setting to 0..." -ForegroundColor Yellow
-    $content = Get-Content $BackupFile
-    $content = $content -replace "PasswordComplexity\s*=\s*\d+", "PasswordComplexity = 0"
-    $content | Set-Content $ModifiedFile
-    Write-Host "PasswordComplexity updated in $ModifiedFile" -ForegroundColor Green
-
-    # Step 3: Reimport the modified security policy
-    Write-Host "Importing modified security policy..." -ForegroundColor Yellow
-    $seceditPath = Join-Path $env:SystemRoot "security\local.sdb"
-    secedit /configure /db $seceditPath /cfg $ModifiedFile /log $LogFile
-    Write-Host "Modified security policy applied successfully." -ForegroundColor Green
-
-    # Step 4: Force Group Policy update
-    Write-Host "Forcing Group Policy update..." -ForegroundColor Yellow
-    gpupdate /force
-    Write-Host "Group Policy updated successfully." -ForegroundColor Green
-}
-catch {
-    Write-Host "An error occurred: $_" -ForegroundColor Red
+    Start-Service -Name $serviceName
+    Write-Host "Service '$serviceName' started successfully." -ForegroundColor Green
+} catch {
+    Write-Host " Failed to start service: $_" -ForegroundColor Red
+    exit 1
 }
 
-# Check the log file for any issues
-Write-Host "Check the log file at $LogFile for detailed information." -ForegroundColor Yellow
-
-# Start service
-try {
-    New-Service -Name "AuthNullEntraAgent" -BinaryPathName "C:\authnull-agent\publish\entra-sync-agent.exe"
-    Start-Service -Name "AuthNullEntraAgent" -WarningAction SilentlyContinue
-}
-catch {
-    Write-Host "Failed to start service" -ForegroundColor Red
-}
-
-Get-Service AuthNullADAgent
-
-# #Restart Computer
-# try {
-#     Write-Host "Waiting for 10 seconds before restarting..." -ForegroundColor Yellow
-#     Start-Sleep -Seconds 10
-#     Restart-Computer -Force
-# }
-# catch {
-#     Write-Host "Restarting computer failed: $_" -ForegroundColor Red
-# }
+# ---------------- STEP 9: Show status ----------------
+Get-Service -Name $serviceName
