@@ -48,7 +48,7 @@ Add-Content -Path $envPath -Value "CLIENT_SECRET=$clientSecret"
 Write-Host "===> Updated app.env with CLIENT_SECRET." -ForegroundColor Green
 
 # === Step 5: Move app.env to agent directory ===
-Move-Item -Path $envPath -Destination "$installDir\app.env" -Force
+Move-Item -Path $envPath -Destination "$installDir\entra-agent\app.env" -Force
 Write-Host "===> Moved app.env to agent folder." -ForegroundColor Green
 
 # === Step 6: Install and start the agent ===
