@@ -46,7 +46,7 @@ print_status "Configuring FreeRADIUS 2FA module..."
 cat << 'EOF' | sudo tee /etc/freeradius/3.0/mods-available/authnull_2fa > /dev/null
 exec authnull_2fa {
     wait = yes
-    program = "/usr/local/bin/authnull_2fa \"%{User-Name}@authnull.com\" \"%{User-Password}\" \"%{CHAP-Password}\" \
+    program = "/usr/local/bin/authnull_2fa \"%{User-Name}\" \"%{User-Password}\" \"%{CHAP-Password}\" \
         \"%{Calling-Station-Id}\" \"%{NAS-IP-Address}\" \"%{NAS-Port}\" \"%{NAS-Port-Id}\" \"%{NAS-Identifier}\" \"%{NAS-Port-Type}\" \"%{Framed-IP-Address}\" \
         \"%{Called-Station-Id}\" \"%{Service-Type}\" \"%{Framed-Protocol}\" \"%{Filter-Id}\" \"%{Class}\" \"%{Session-Timeout}\" \
         \"%{Idle-Timeout}\" \"%{Acct-Session-Id}\" \"%{Acct-Input-Octets}\" \"%{Acct-Output-Octets}\" \"%{Vendor-Specific}\" \
