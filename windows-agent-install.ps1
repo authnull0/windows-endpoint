@@ -126,7 +126,7 @@ else {
 
 #-------------------------------------------------------------------------------------
 # Define the URL of the file to download
-$url = "https://github.com/authnull0/windows-endpoint/archive/refs/heads/main.zip"
+$url = "https://github.com/authnull0/windows-endpoint/raw/refs/heads/main/windows-agent.zip"
 
 try {
     $webClient = New-Object System.Net.WebClient
@@ -227,24 +227,24 @@ else {
 #---------------------------------------------------------------------------
 Write-Host "Extracting agent" -ForegroundColor Yellow
 
-$AgentPath = $OutputPath + "\windows-endpoint-main\agent\windows-build.zip"
+# $AgentPath = $OutputPath + "\windows-agent\windows-build.zip"
 
-if (Test-Path $AgentPath) {
-    # Extract the file
-    try {
-        Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
-        Write-Host "Extraction completed successfully." -ForegroundColor Green
-    }
-    catch {
-        Write-Host "Extraction failed: $_" -ForegroundColor Red
-    }
-} 
-else {
-    Write-Host "Zip file not found at: $zipFilePath" -ForegroundColor Red
-}
+# if (Test-Path $AgentPath) {
+#     # Extract the file
+#     try {
+#         Expand-Archive -Path "$OutputPath\file.zip" -DestinationPath $OutputPath -Force
+#         Write-Host "Extraction completed successfully." -ForegroundColor Green
+#     }
+#     catch {
+#         Write-Host "Extraction failed: $_" -ForegroundColor Red
+#     }
+# } 
+# else {
+#     Write-Host "Zip file not found at: $zipFilePath" -ForegroundColor Red
+# }
 
 #reusing agent path
-$AgentPath = $OutputPath + "\windows-endpoint-main\agent\windows-build\windows-agent-amd64.exe"
+$AgentPath = $OutputPath + "\windows-agent\windows-build\windows-agent-amd64.exe"
 Copy-Item -Path $AgentPath -Destination $OutputPath -Force -Verbose
 
 
@@ -376,7 +376,7 @@ if ($envDict["ADMFA"] -eq "1") {
 else {
 
     #Installing Microsoft Visual C++     
-    $InstallPath = $OutputPath + "\windows-endpoint-main\credential-provider\pgina\vcRedist_x64.exe"  
+    $InstallPath = $OutputPath + "\windows-agent\credential-provider\pgina\vcRedist_x64.exe"  
 
     # Check if Visual C++ Redistributable is installed
     $vcRedistKey = "HKLM:\SOFTWARE\Wow6432Node\Microsoft\VisualStudio\11.0\VC\Runtimes\x64" 
@@ -411,7 +411,7 @@ else {
 
 
 
-    $InstallPath = $OutputPath + "\windows-endpoint-main\credential-provider\pgina\vcredist_x86.exe"  
+    $InstallPath = $OutputPath + "\windows-agent\credential-provider\pgina\vcredist_x86.exe"  
 
     # Check if Visual C++ Redistributable is installed
     $vcRedistKey = "HKLM:\SOFTWARE\Wow6432Node\Microsoft\VisualStudio\11.0\VC\Runtimes\x86"  
@@ -447,7 +447,7 @@ else {
 
 
     #Installing pGina
-    $InstallerPath = $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+    $InstallerPath = $OutputPath + "\windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
 
     if (-not $InstallerPath) {
         Write-Host "Installation path does not exist" -ForegroundColor Yellow
@@ -456,7 +456,7 @@ else {
     # Check if the installer executable exists
     if (Test-Path $InstallerPath) {
         #Installing pGina
-        $InstallerPath = $OutputPath + "\windows-endpoint-main\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
+        $InstallerPath = $OutputPath + "\windows-agent\credential-provider\pgina\pGinaSetup-3.1.8.0.exe"
         Write-Host "Please close the pGina after installation.." -ForegroundColor Green
         if (-not $InstallerPath) {
             Write-Host "Installation path does not exist" -ForegroundColor Yellow
@@ -491,278 +491,277 @@ else {
 
     }
     #-----------------------------------------------------------------------------
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+# Add-Type -AssemblyName System.Windows.Forms
+# Add-Type -AssemblyName System.Drawing
 
-# Function to read environment variables from app.env file
-function Get-EnvVariables {
-    param (
-        [string]$filePath
-    )
-    $envDict = @{}
-    $envContent = Get-Content -Path $filePath
-    foreach ($line in $envContent) {
-        if ($line -match "=") {
-            $key, $value = $line -split "=", 2
-            $envDict[$key.Trim()] = $value.Trim()
-        }
-    }
-    return $envDict
-}
+# # Function to read environment variables from app.env file
+# function Get-EnvVariables {
+#     param (
+#         [string]$filePath
+#     )
+#     $envDict = @{}
+#     $envContent = Get-Content -Path $filePath
+#     foreach ($line in $envContent) {
+#         if ($line -match "=") {
+#             $key, $value = $line -split "=", 2
+#             $envDict[$key.Trim()] = $value.Trim()
+#         }
+#     }
+#     return $envDict
+# }
 
-# Function to show a dialog box to get the LDAP username and password from the user
-function Show-CredentialsDialog {
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = "Enter LDAP Credentials"
-    $form.Size = New-Object System.Drawing.Size(450, 250)  # Increased form size
-    $form.StartPosition = "CenterScreen"
-    $form.Font = New-Object System.Drawing.Font('Arial', 10)  # Set default font
+# # Function to show a dialog box to get the LDAP username and password from the user
+# function Show-CredentialsDialog {
+#     $form = New-Object System.Windows.Forms.Form
+#     $form.Text = "Enter LDAP Credentials"
+#     $form.Size = New-Object System.Drawing.Size(450, 250)  # Increased form size
+#     $form.StartPosition = "CenterScreen"
+#     $form.Font = New-Object System.Drawing.Font('Arial', 10)  # Set default font
 
-    # Label for Username
-    $labelUsername = New-Object System.Windows.Forms.Label
-    $labelUsername.Text = "Username:"
-    $labelUsername.Location = New-Object System.Drawing.Point(10, 20)
-    $labelUsername.Size = New-Object System.Drawing.Size(80, 25)
-    $form.Controls.Add($labelUsername)
+#     # Label for Username
+#     $labelUsername = New-Object System.Windows.Forms.Label
+#     $labelUsername.Text = "Username:"
+#     $labelUsername.Location = New-Object System.Drawing.Point(10, 20)
+#     $labelUsername.Size = New-Object System.Drawing.Size(80, 25)
+#     $form.Controls.Add($labelUsername)
 
-    # TextBox for Username
-    $textBoxUsername = New-Object System.Windows.Forms.TextBox
-    $textBoxUsername.Location = New-Object System.Drawing.Point(100, 20)
-    $textBoxUsername.Width = 300  # Increased width
-    $textBoxUsername.Font = New-Object System.Drawing.Font('Arial', 12)  # Increased font size
-    $form.Controls.Add($textBoxUsername)
+#     # TextBox for Username
+#     $textBoxUsername = New-Object System.Windows.Forms.TextBox
+#     $textBoxUsername.Location = New-Object System.Drawing.Point(100, 20)
+#     $textBoxUsername.Width = 300  # Increased width
+#     $textBoxUsername.Font = New-Object System.Drawing.Font('Arial', 12)  # Increased font size
+#     $form.Controls.Add($textBoxUsername)
 
-    # Label for Password
-    $labelPassword = New-Object System.Windows.Forms.Label
-    $labelPassword.Text = "Password:"
-    $labelPassword.Location = New-Object System.Drawing.Point(10, 60)
-    $labelPassword.Size = New-Object System.Drawing.Size(80, 25)
-    $form.Controls.Add($labelPassword)
+#     # Label for Password
+#     $labelPassword = New-Object System.Windows.Forms.Label
+#     $labelPassword.Text = "Password:"
+#     $labelPassword.Location = New-Object System.Drawing.Point(10, 60)
+#     $labelPassword.Size = New-Object System.Drawing.Size(80, 25)
+#     $form.Controls.Add($labelPassword)
 
-    # TextBox for Password
-    $textBoxPassword = New-Object System.Windows.Forms.TextBox
-    $textBoxPassword.Location = New-Object System.Drawing.Point(100, 60)
-    $textBoxPassword.Width = 300  # Increased width
-    $textBoxPassword.Font = New-Object System.Drawing.Font('Arial', 12)  # Increased font size
-    $textBoxPassword.UseSystemPasswordChar = $true
-    $form.Controls.Add($textBoxPassword)
+#     # TextBox for Password
+#     $textBoxPassword = New-Object System.Windows.Forms.TextBox
+#     $textBoxPassword.Location = New-Object System.Drawing.Point(100, 60)
+#     $textBoxPassword.Width = 300  # Increased width
+#     $textBoxPassword.Font = New-Object System.Drawing.Font('Arial', 12)  # Increased font size
+#     $textBoxPassword.UseSystemPasswordChar = $true
+#     $form.Controls.Add($textBoxPassword)
 
-    # OK Button
-    $buttonOk = New-Object System.Windows.Forms.Button
-    $buttonOk.Text = "OK"
-    $buttonOk.Location = New-Object System.Drawing.Point(100, 100)
-    $buttonOk.Size = New-Object System.Drawing.Size(80, 35)
-    $buttonOk.Add_Click({
-        $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
-        $form.Close()
-    })
-    $form.Controls.Add($buttonOk)
+#     # OK Button
+#     $buttonOk = New-Object System.Windows.Forms.Button
+#     $buttonOk.Text = "OK"
+#     $buttonOk.Location = New-Object System.Drawing.Point(100, 100)
+#     $buttonOk.Size = New-Object System.Drawing.Size(80, 35)
+#     $buttonOk.Add_Click({
+#         $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
+#         $form.Close()
+#     })
+#     $form.Controls.Add($buttonOk)
 
-    # Cancel Button
-    $buttonCancel = New-Object System.Windows.Forms.Button
-    $buttonCancel.Text = "Cancel"
-    $buttonCancel.Location = New-Object System.Drawing.Point(200, 100)
-    $buttonCancel.Size = New-Object System.Drawing.Size(80, 35)
-    $buttonCancel.Add_Click({
-        $form.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-        $form.Close()
-    })
-    $form.Controls.Add($buttonCancel)
+#     # Cancel Button
+#     $buttonCancel = New-Object System.Windows.Forms.Button
+#     $buttonCancel.Text = "Cancel"
+#     $buttonCancel.Location = New-Object System.Drawing.Point(200, 100)
+#     $buttonCancel.Size = New-Object System.Drawing.Size(80, 35)
+#     $buttonCancel.Add_Click({
+#         $form.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+#         $form.Close()
+#     })
+#     $form.Controls.Add($buttonCancel)
 
-    $form.AcceptButton = $buttonOk
-    $form.CancelButton = $buttonCancel
+#     $form.AcceptButton = $buttonOk
+#     $form.CancelButton = $buttonCancel
 
-    $result = $form.ShowDialog()
+#     $result = $form.ShowDialog()
 
-    if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-        return @{
-            Username = $textBoxUsername.Text
-            Password = $textBoxPassword.Text
-        }
-    } else {
-        return $null
-    }
-}
+#     if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+#         return @{
+#             Username = $textBoxUsername.Text
+#             Password = $textBoxPassword.Text
+#         }
+#     } else {
+#         return $null
+#     }
+# }
 
-# Read environment variables from app.env file
-$envFilePath = "C:\authnull-agent\app.env"
-$envDict = Get-EnvVariables -filePath $envFilePath
+# # Read environment variables from app.env file
+# $envFilePath = "C:\authnull-agent\app.env"
+# $envDict = Get-EnvVariables -filePath $envFilePath
 
-# Get LDAP details from environment variables
-$ldapHost = $envDict["LDAP_HOST"]
-$ldapPort = $envDict["LDAP_PORT"]
-$searchDn = $envDict["SEARCH_DN"]
-$DomainName = $envDict["DomainName"]
+# # Get LDAP details from environment variables
+# $ldapHost = $envDict["LDAP_HOST"]
+# $ldapPort = $envDict["LDAP_PORT"]
+# $searchDn = $envDict["SEARCH_DN"]
+# $DomainName = $envDict["DomainName"]
 
-# Show dialog box to get the LDAP username and password from the user
-$credentials = Show-CredentialsDialog
+# # Show dialog box to get the LDAP username and password from the user
+# $credentials = Show-CredentialsDialog
 
-if ($credentials -eq $null) {
-    Write-Host "LDAP credentials entry was canceled." -ForegroundColor Red
-    exit
-}
+# if ($credentials -eq $null) {
+#     Write-Host "LDAP credentials entry was canceled." -ForegroundColor Red
+#     exit
+# }
 
-$ldapUsername = $credentials.Username
-$ldapPassword = $credentials.Password
+# $ldapUsername = $credentials.Username
+# $ldapPassword = $credentials.Password
 
-#Store the Password in app.env file as PASSWORD
-#$envDict["PASSWORD"] = $ldapPassword
-#$envDict | ForEach-Object { "$($_.Key)=$($_.Value)" } | Set-Content -Path $envFilePath
+# #Store the Password in app.env file as PASSWORD
+# #$envDict["PASSWORD"] = $ldapPassword
+# #$envDict | ForEach-Object { "$($_.Key)=$($_.Value)" } | Set-Content -Path $envFilePath
 
 # Log Username and password just for testing
-Write-Host "LDAP Username: $($credentials.Username)"
-Write-Host "LDAP Password: $($credentials.Password)"
+# Write-Host "LDAP Username: $($credentials.Username)"
+# Write-Host "LDAP Password: $($credentials.Password)"
 
-# Function to display a prompt for selecting AD groups
-function Select-ADGroups {
-    param (
-        [string]$ldapHost,
-        [string]$ldapPort,
-        [string]$searchDn,
-        [string]$username,
-        [string]$password
-    )
+# # Function to display a prompt for selecting AD groups
+# function Select-ADGroups {
+#     param (
+#         [string]$ldapHost,
+#         [string]$ldapPort,
+#         [string]$searchDn,
+#         [string]$username,
+#         [string]$password
+#     )
 
-    $ldapPath = "LDAP://${ldapHost}:${ldapPort}/${searchDn}"
-    $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($ldapPath, $username, $password)
-    $directorySearcher = New-Object System.DirectoryServices.DirectorySearcher($directoryEntry)
-    $directorySearcher.Filter = "(objectClass=group)"
-    $directorySearcher.PageSize = 1000
-    $groups = $directorySearcher.FindAll() | ForEach-Object { $_.Properties["name"] } | Sort-Object
+#     $ldapPath = "LDAP://${ldapHost}:${ldapPort}/${searchDn}"
+#     $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($ldapPath, $username, $password)
+#     $directorySearcher = New-Object System.DirectoryServices.DirectorySearcher($directoryEntry)
+#     $directorySearcher.Filter = "(objectClass=group)"
+#     $directorySearcher.PageSize = 1000
+#     $groups = $directorySearcher.FindAll() | ForEach-Object { $_.Properties["name"] } | Sort-Object
 
-    if ($groups.Count -eq 0) {
-        Write-Host "No groups found in the LDAP search." -ForegroundColor Yellow
-        return $null
-    }
+#     if ($groups.Count -eq 0) {
+#         Write-Host "No groups found in the LDAP search." -ForegroundColor Yellow
+#     }
 
-    $selectedGroups = $groups | Out-GridView -Title "Select AD Groups" -PassThru
-    return $selectedGroups
-}
+#     $selectedGroups = $groups | Out-GridView -Title "Select AD Groups" -PassThru
+#     return $selectedGroups
+# }
 
-# Prompt user to select AD groups
-$selectedGroups = Select-ADGroups -ldapHost $ldapHost -ldapPort $ldapPort -searchDn $searchDn -username $ldapUsername -password $ldapPassword
+# # Prompt user to select AD groups
+# $selectedGroups = Select-ADGroups -ldapHost $ldapHost -ldapPort $ldapPort -searchDn $searchDn -username $ldapUsername -password $ldapPassword
 
-if ($selectedGroups -eq $null) {
-    Write-Host "No groups were selected or found." -ForegroundColor Red
-    exit
-}
+# if ($selectedGroups -eq $null) {
+#     Write-Host "No groups were selected or found." -ForegroundColor Red
+#     exit
+# }
 
-# Store selected groups in a file
-$selectedGroups | Out-File -FilePath "C:\selected_user_groups.conf"
+# # Store selected groups in a file
+# $selectedGroups | Out-File -FilePath "C:\selected_user_groups.conf"
 
-# Read selected groups from the file
-$groups = Get-Content -Path "C:\selected_user_groups.conf"
+# # Read selected groups from the file
+# $groups = Get-Content -Path "C:\selected_user_groups.conf"
 
-foreach ($group in $groups) {
-    $group = $group.Trim()  # Trim any leading or trailing whitespace
-    $RemoteDesktopGroup = "Remote Desktop Users"
+# foreach ($group in $groups) {
+#     $group = $group.Trim()  # Trim any leading or trailing whitespace
+#     $RemoteDesktopGroup = "Remote Desktop Users"
 
-    # Check if the local group exists
-    try {
-        $localGroupExists = net localgroup $group | Out-Null
-        if ($localGroupExists) {
-            Write-Host "Group '$group' exists locally." -ForegroundColor Green
-            $groupExists = $true
-        } else {
-            $groupExists = $false
-            Write-Host "Group '$group' does not exist locally." -ForegroundColor Yellow
-        }
-    }
-    catch {
-        Write-Host "Error checking local group '$group': $_" -ForegroundColor Red
-        $groupExists = $false
-    }
+#     # Check if the local group exists
+#     try {
+#         $localGroupExists = net localgroup $group | Out-Null
+#         if ($localGroupExists) {
+#             Write-Host "Group '$group' exists locally." -ForegroundColor Green
+#             $groupExists = $true
+#         } else {
+#             $groupExists = $false
+#             Write-Host "Group '$group' does not exist locally." -ForegroundColor Yellow
+#         }
+#     }
+#     catch {
+#         Write-Host "Error checking local group '$group': $_" -ForegroundColor Red
+#         $groupExists = $false
+#     }
 
-    if ($groupExists) {
-        # Add local or domain group to 'Remote Desktop Users' group
-        try {
-            net localgroup "Remote Desktop Users" $group /add
-            Write-Host "Successfully added '$group' to the 'Remote Desktop Users' group." -ForegroundColor Green
-        }
-        catch {
-            Write-Host "Failed to add '$group' to the 'Remote Desktop Users' group. Error: $_" -ForegroundColor Red
-        }
-    }
-    else {
-        # If group doesn't exist, create it
-        Write-Host "Creating the group '$group' locally." -ForegroundColor Yellow
-        try {
-            net localgroup $group /add
-            Write-Host "Successfully created local group '$group'." -ForegroundColor Green
-            # Add the newly created local group to the Remote Desktop Users group
-             net localgroup "Remote Desktop Users" $group /add
-            Write-Host "Successfully added local group '$group' to the 'Remote Desktop Users' group." -ForegroundColor Green
-        }
-        catch {
-            Write-Host "Failed to create or add local group '$group' to the 'Remote Desktop Users' group. Error: $_" -ForegroundColor Red
-        }
-    }
-}
+#     if ($groupExists) {
+#         # Add local or domain group to 'Remote Desktop Users' group
+#         try {
+#             net localgroup "Remote Desktop Users" $group /add
+#             Write-Host "Successfully added '$group' to the 'Remote Desktop Users' group." -ForegroundColor Green
+#         }
+#         catch {
+#             Write-Host "Failed to add '$group' to the 'Remote Desktop Users' group. Error: $_" -ForegroundColor Red
+#         }
+#     }
+#     else {
+#         # If group doesn't exist, create it
+#         Write-Host "Creating the group '$group' locally." -ForegroundColor Yellow
+#         try {
+#             net localgroup $group /add
+#             Write-Host "Successfully created local group '$group'." -ForegroundColor Green
+#             # Add the newly created local group to the Remote Desktop Users group
+#              net localgroup "Remote Desktop Users" $group /add
+#             Write-Host "Successfully added local group '$group' to the 'Remote Desktop Users' group." -ForegroundColor Green
+#         }
+#         catch {
+#             Write-Host "Failed to create or add local group '$group' to the 'Remote Desktop Users' group. Error: $_" -ForegroundColor Red
+#         }
+#     }
+# }
     #-------------------------------------------------------------------------------------
 #Make an API call to Store the Machine Name , IP Address and The Group Names Selected
 # Function to get the machine name and IP address
-function Get-MachineInfo {
-    $machineName = $env:COMPUTERNAME
-    $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Ethernet" | Select-Object -First 1).IPAddress
-    return @{
-        MachineName = $machineName
-        IPAddress = $ipAddress
-    }
-}
+# function Get-MachineInfo {
+#     $machineName = $env:COMPUTERNAME
+#     $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Ethernet" | Select-Object -First 1).IPAddress
+#     return @{
+#         MachineName = $machineName
+#         IPAddress = $ipAddress
+#     }
+# }
 
-# Function to make an API call to store the machine info and selected groups
-function Store-MachineInfo {
-    param (
-        [string]$apiUrl,
-        [hashtable]$machineInfo,
-        [array]$groups,
-        [int]$orgID,
-        [int]$tenantID
-    )
+# # Function to make an API call to store the machine info and selected groups
+# function Store-MachineInfo {
+#     param (
+#         [string]$apiUrl,
+#         [hashtable]$machineInfo,
+#         [array]$groups,
+#         [int]$orgID,
+#         [int]$tenantID
+#     )
 
-    $body = @{
-        endpointName = $machineInfo.MachineName
-        ipAddress = $machineInfo.IPAddress
-        groupNames = $groups
-        orgId = $orgID
-        tenantId = $tenantID
-    } | ConvertTo-Json
+#     $body = @{
+#         endpointName = $machineInfo.MachineName
+#         ipAddress = $machineInfo.IPAddress
+#         groupNames = $groups
+#         orgId = $orgID
+#         tenantId = $tenantID
+#     } | ConvertTo-Json
 
-    try {
-        $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Body $body -ContentType "application/json"
-        Write-Host "API call successful. Response: $response" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "API call failed: $_" -ForegroundColor Red
-        exit
-    }
-}
+#     try {
+#         $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Body $body -ContentType "application/json"
+#         Write-Host "API call successful. Response: $response" -ForegroundColor Green
+#     }
+#     catch {
+#         Write-Host "API call failed: $_" -ForegroundColor Red
+#         exit
+#     }
+# }
 
-# Read environment variables from app.env file
-$envFilePath = "C:\authnull-agent\app.env"
-$envDict = Get-EnvVariables -filePath $envFilePath
+# # Read environment variables from app.env file
+# $envFilePath = "C:\authnull-agent\app.env"
+# $envDict = Get-EnvVariables -filePath $envFilePath
 
-# Get OrgID and TenantID from environment variables and convert to integers
-$orgID = [int]$envDict["ORG_ID"]
-$tenantID = [int]$envDict["TENANT_ID"]
+# # Get OrgID and TenantID from environment variables and convert to integers
+# $orgID = [int]$envDict["ORG_ID"]
+# $tenantID = [int]$envDict["TENANT_ID"]
 
-# Get machine info
-$machineInfo = Get-MachineInfo
+# # Get machine info
+# $machineInfo = Get-MachineInfo
 
-# Read selected groups from the file
-$groups = Get-Content -Path "C:\selected_user_groups.conf"
+# # Read selected groups from the file
+# $groups = Get-Content -Path "C:\selected_user_groups.conf"
 
-# Log the groups for testing purposes
-Write-Host "Selected Groups:"
-foreach ($group in $groups) {
-    Write-Host $group
-}
+# # Log the groups for testing purposes
+# Write-Host "Selected Groups:"
+# foreach ($group in $groups) {
+#     Write-Host $group
+# }
 
-# Define the API URL
-$apiUrl = "https://prod.tenants.authnull.com/addEndpointGroups" # Need to Update this to get from the app.env file-23/01/2025
+# # Define the API URL
+# $apiUrl = "https://prod.tenants.authnull.com/addEndpointGroups" # Need to Update this to get from the app.env file-23/01/2025
 
-# Make the API call to store the machine info and selected groups
-Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -orgID $orgID -tenantID $tenantID 
+# # Make the API call to store the machine info and selected groups
+# Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -orgID $orgID -tenantID $tenantID 
 #-------------------------------------------------------------------------------------
     #modify machine config
     # Define the path to the machine.config file
@@ -815,7 +814,7 @@ Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -org
     #copy plugins 
 
     # Define the source directory path
-    $sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\plugins" 
+    $sourceDirectory = $OutputPath + "\windows-agent\credential-provider\plugins" 
 
     # Define the destination directory path
     Write-Host "Copying plugins... please wait" -ForegroundColor Yellow
@@ -841,7 +840,7 @@ Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -org
     #-------------------------------------------------------------------------------------
     #copy depedency dlls
     Write-Host "Copying dependencies .." -ForegroundColor Green
-    $sourceDirectory = $OutputPath + "\windows-endpoint-main\credential-provider\dll-dependencies" 
+    $sourceDirectory = $OutputPath + "\windows-agent\credential-provider\dll-dependencies" 
     $destinationDirectory = "C:\Windows\System32" 
 
     Copy-Item -Path "$sourceDirectory\*" -Destination $destinationDirectory -Recurse -Force -Verbose
@@ -850,8 +849,8 @@ Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -org
     #--------------------------------------------------------------------------
     #updating group policy to enable and disable respective credential providers
 
-    $lgpoPath = $OutputPath + "\windows-endpoint-main\gpo\LGPO.exe"
-    $backupFolder = $OutputPath + "\windows-endpoint-main\gpo\registry.pol"
+    $lgpoPath = $OutputPath + "\windows-agent\gpo\LGPO.exe"
+    $backupFolder = $OutputPath + "\windows-agent\gpo\registry.pol"
     #$infFilePath = $OutputPath + "\windows-endpoint-main\gpo\security.inf"
     
     # try {
@@ -914,9 +913,9 @@ Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -org
     }           
     
     #---------------------------------------------------------------------
-    Write-Host "Configuring pgina for both local user and AD user authentication" -ForegroundColor Green
+    Write-Host "Configuring pgina for user authentication" -ForegroundColor Green
     # Define the path to your registry file
-    $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\pgina.reg"
+    $registryFilePath = $OutputPath + "\windows-agent\gpo\pgina.reg"
 
     # Check if the file exists
     try {
@@ -939,10 +938,14 @@ Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -org
     #Setting LocalAdminFallback Registry 
     set-ItemProperty -Path "HKLM:\Software\pGina3\plugins\12fa152d-a2e3-4c8d-9535-5dcd49dfcb6d" -Name "LocalAdminFallBack" -Value "True" -Type String -Force -Verbose
     Write-Host "Local Admin Fallback registry added successfully.." -ForegroundColor Green
-    #--------------------------------------------------------------------------------
 
-    Write-Host "LDAP Plugin Settings" -ForegroundColor Green
-    $registryFilePath = $OutputPath + "\windows-endpoint-main\gpo\ldap.reg"
+    #Disabling Pgina Version in logon screen
+    Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "EnableMotd" -Value "False" -Type String -Force -Verbose
+    Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "Motd" -Value "" -Type String -Force -Verbose
+
+    #--------------------------------------------------------------------------------
+    #Write-Host "LDAP Plugin Settings" -ForegroundColor Green
+    $registryFilePath = $OutputPath + "\windows-agent\gpo\ldap.reg"
     try {
         # Check if the file exists
         if (Test-Path $registryFilePath) {
@@ -992,14 +995,15 @@ Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -org
 
     # Loop through the expected keys and update the registry
     foreach ($key in $expectedKeys.Keys) {
+        $value = $null  # Clear previous value
         if ($envDict.ContainsKey($key)) {
        
             $value = $envDict[$key]
         }
-        else {
+        # else {
         
-            $value = Read-Host "Enter value for $key"
-        }
+        #     $value = Read-Host "Enter value for $key"
+        # }
     
         if ($key -eq "LDAP_PORT") {
             # $value = "{0:x}" -f [int]$value
@@ -1009,9 +1013,52 @@ Store-MachineInfo -apiUrl $apiUrl -machineInfo $machineInfo -groups $groups -org
         Set-ItemProperty -Path $registryKeyPath -Name $expectedKeys[$key] -Value $value -Force 
     }
 
-    Write-Host "Configured LDAP Plugins Successfully.." -ForegroundColor Green
-    Write-Host "Restart your system to apply the changes.." -ForegroundColor Green
+    # Paths
+    $imagePath = "C:\authnull-agent"
+     # Read IMAGE_URL from app.env
+    $imageUrlLine = Get-Content -Path $envFilePath | Where-Object { $_ -match "^IMAGE_URL=" }
+    $imageUrl = $imageUrlLine -replace "^IMAGE_URL=", ""
+    $imageUrl = $imageUrl.Trim()
 
+    
+    if (-not [string]::IsNullOrWhiteSpace($imageUrl)) {
+   
+    # Continue only if imageUrl is valid
+    $tempImagePath = Join-Path $imagePath "temp_tile_image.png"
+    $bmpImagePath = Join-Path $imagePath "tile_image.bmp"
+
+    # Download image
+    Invoke-WebRequest -Uri $imageUrl -OutFile $tempImagePath
+
+    # Load and convert image with white background
+    Add-Type -AssemblyName System.Drawing
+
+    $originalImage = [System.Drawing.Image]::FromFile($tempImagePath)
+
+    # Create new blank bitmap with white background
+    $bitmap = New-Object System.Drawing.Bitmap $originalImage.Width, $originalImage.Height
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    $graphics.Clear([System.Drawing.Color]::White)
+    $graphics.DrawImage($originalImage, 0, 0, $originalImage.Width, $originalImage.Height)
+
+    # Save as BMP
+    $bitmap.Save($bmpImagePath, [System.Drawing.Imaging.ImageFormat]::Bmp)
+
+    # Cleanup
+    $graphics.Dispose()
+    $originalImage.Dispose()
+    $bitmap.Dispose()
+    Remove-Item $tempImagePath -Force
+
+    # Set registry key to BMP
+    Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "TileImage" -Value $bmpImagePath -Type String -Force -Verbose
+    Write-Host "Applying tenant-specific logo to the Windows login screen..." -ForegroundColor Green
+    
+    } else{
+        Write-Host "No IMAGE_URL found in app.env. Skipping image processing." -ForegroundColor Green
+        Set-ItemProperty -Path "HKLM:\Software\pGina3" -Name "TileImage" -Value "" -Type String -Force -Verbose
+        Write-Host "Default PGINA Logo will take over Logon Screen" -ForegroundColor Green
+    }
 
     #------------------------------------------------------------------------------------------------------------------------------------
     #Restart Computer
