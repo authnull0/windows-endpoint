@@ -100,5 +100,25 @@ if (Test-Path $pginaLocalDll) {
 } else {
     throw "LocalMachine plugin not found at $pginaLocalDll"
 }
+
+# Move app.env from Desktop to authnull-agent directory
+Write-Host "Moving app.env configuration file..." -ForegroundColor Yellow
+$desktopPath = [Environment]::GetFolderPath("Desktop")
+$appEnvSource = "$desktopPath\app.env"
+$appEnvDestination = "C:\authnull-agent\app.env"
+
+if (Test-Path $appEnvSource) {
+    try {
+        Move-Item -Path $appEnvSource -Destination $appEnvDestination -Force -ErrorAction Stop
+        Write-Host "Moved app.env from Desktop to C:\authnull-agent\" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Failed to move app.env: $($_.Exception.Message)" -ForegroundColor Red
+        throw
+    }
+} else {
+    Write-Host "Warning: app.env file not found on Desktop at $appEnvSource" -ForegroundColor Yellow
+    Write-Host "Please ensure the app.env file is manually placed in C:\authnull-agent\" -ForegroundColor Yellow
+}
  
 Write-Host "Setup completed successfully. pGina installed and plugins prepared." -ForegroundColor Green
