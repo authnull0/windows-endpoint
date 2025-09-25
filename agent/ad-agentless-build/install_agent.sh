@@ -36,7 +36,7 @@ EOF
 [ -f /etc/freeradius/3.0/mods-enabled/exec ] || sudo ln -sf /etc/freeradius/3.0/mods-available/exec /etc/freeradius/3.0/mods-enabled/
 
 print_status "Installing 2FA script (authnull_2fa)..."
-sudo wget https://raw.githubusercontent.com/authnull0/windows-endpoint/main/agent/ad-agentless-build/authnull_2fa -O authnull_2fa
+sudo wget https://raw.githubusercontent.com/authnull0/windows-endpoint/linux-testing/agent/ad-agentless-build/authnull_2fa -O authnull_2fa
 chmod +x authnull_2fa || { echo -e "${RED}Failed to download authnull_2fa!${NC}"; exit 1; }
 sudo mv authnull_2fa /usr/local/bin/
 sudo chmod 755 /usr/local/bin/authnull_2fa
