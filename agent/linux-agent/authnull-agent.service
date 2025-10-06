@@ -10,8 +10,8 @@ User=root
 Group=root
 WorkingDirectory=/usr/local/sbin/
 EnvironmentFile=/usr/local/sbin/app.env
-StandardOutput=syslog
-StandardError=syslog
+StandardOutput=append:/var/log/authnull-agent.log
+StandardError=append:/var/log/authnull-agent.log
 
 [Install]
 WantedBy=multi-user.target
