@@ -1,10 +1,22 @@
 #!/bin/bash
 
+AGENT_BINARY="authnull-agent"
+agent_status() {
+    echo "Checking if $AGENT_BINARY is already running"
+    if pgrep -x "$AGENT_BINARY" >/dev/null; then
+        echo "Process $AGENT_BINARY is running."
+        return 0  # success means running
+    else 
+        echo "Process $AGENT_BINARY is not running"
+        return 1 # failure means not running 
+    fi
+}
+
 # Download the agent file
-sudo wget https://github.com/authnull0/windows-endpoint/raw/linux-agent/agent/linux-agent/authnull-agent
+sudo wget -O authnull-agent https://github.com/authnull0/windows-endpoint/raw/linux-agent/agent/linux-agent/authnull-agent
 echo "Authnull Agent downloaded..."
 
-sudo wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/linux-agent/agent/linux-agent/authnull-agent.service
+sudo wget -O authnull-agent.service https://github.com/authnull0/windows-endpoint/raw/refs/heads/linux-agent/agent/linux-agent/authnull-agent.service
 echo "Authnull Agent service file downloaded..."
 
 echo "Please enter the content for the app.env file. End with an empty line or Ctrl+D:"
@@ -34,6 +46,13 @@ echo "copying service file successfully to /etc/systemd/system/...."
 sudo chmod 644 /etc/systemd/system/authnull-agent.service
 echo "Changing the service file permission successfully.."
 
+#Check the agent status before updating it 
+if agent_status; then
+        echo "Stopping $AGENT_BINARY before updating it"
+        sudo systemctl stop "$AGENT_BINARY" 2>/dev/null || sudo pkill -9 "$AGENT_BINARY"
+        sudo systemctl daemon-reload
+        sleep 1
+fi
 #Move the authnull-agent to /usr/local/bin/ and give permission
 sudo cp authnull-agent /usr/local/sbin/
 echo "Copied authnull-agent successfully to /usr/local/sbin/.."
@@ -60,6 +79,17 @@ sudo systemctl enable authnull-agent
 echo "enabling agent..."
 sudo systemctl start authnull-agent
 echo "start the agent..."
+
+echo "Check $AGENT_BINARY status."
+    if agent_status; then
+        echo "Linux Agent Installation Complteted."
+        echo ""
+        echo "Linux Agent Running as a Service Successfully."
+
+    else
+        echo "Linux Agent Service Installation Failed"
+        exit 1 
+    fi
 
 
 
