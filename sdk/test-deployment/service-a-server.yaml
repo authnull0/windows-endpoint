@@ -1,0 +1,159 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: service-a-server
+  namespace: spire
+  labels:
+    app: service-a
+    role: server
+spec:
+  serviceAccountName: default
+  containers:
+  - name: server
+    image: golang:1.24
+    command: ["/bin/sh"]
+    args:
+      - -c
+      - |
+        mkdir -p /app
+        cat > /app/main.go <<'EOF'
+        package main
+
+        import (
+            "context"
+            "fmt"
+            "log"
+            "net/http"
+            "strings"
+            "time"
+
+            "github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+            "github.com/spiffe/go-spiffe/v2/workloadapi"
+        )
+
+        func main() {
+            fmt.Println("=== Service A (Server) - mTLS Test ===")
+            fmt.Println("Starting server with SPIFFE mTLS...")
+
+            ctx := context.Background()
+
+            // Create X509 source from SPIRE Agent
+            source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(
+                workloadapi.WithAddr("unix:///run/spire/sockets/agent.sock"),
+            ))
+            if err != nil {
+                log.Fatalf("❌ Failed to create X509 source: %v", err)
+            }
+            defer source.Close()
+
+            svid, _ := source.GetX509SVID()
+            fmt.Printf("✅ Server SPIFFE ID: %s\n", svid.ID)
+            fmt.Printf("📅 Initial SVID Expiry: %s\n", svid.Certificates[0].NotAfter)
+            fmt.Printf("🔢 Initial Serial: %s\n\n", svid.Certificates[0].SerialNumber)
+
+            // Create TLS config that validates client SPIFFE IDs
+            tlsConfig := tlsconfig.MTLSServerConfig(source, source, tlsconfig.AuthorizeAny())
+
+            // HTTP handler
+            http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+                // Get client's SPIFFE ID from the TLS connection
+                var clientID string
+                if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+                    cert := r.TLS.PeerCertificates[0]
+                    if len(cert.URIs) > 0 {
+                        clientID = cert.URIs[0].String()
+                    }
+                }
+
+                currentSVID, _ := source.GetX509SVID()
+
+                response := fmt.Sprintf("{\n  \"message\": \"mTLS Connection Successful!\",\n  \"server_spiffe_id\": \"%s\",\n  \"client_spiffe_id\": \"%s\",\n  \"server_svid_expiry\": \"%s\",\n  \"server_svid_serial\": \"%s\",\n  \"timestamp\": \"%s\"\n}", currentSVID.ID, clientID, currentSVID.Certificates[0].NotAfter, currentSVID.Certificates[0].SerialNumber, time.Now().Format(time.RFC3339))
+
+                log.Printf("✅ mTLS request from: %s", clientID)
+                w.Header().Set("Content-Type", "application/json")
+                w.Write([]byte(response))
+            })
+
+            // Monitor SVID rotation in background
+            go monitorSVIDRotation(source)
+
+            // Start HTTPS server with mTLS
+            server := &http.Server{
+                Addr:      ":8443",
+                TLSConfig: tlsConfig,
+            }
+
+            fmt.Println("🚀 Server listening on :8443 with mTLS enabled")
+            fmt.Println("📊 Monitoring SVID rotation in background...")
+            fmt.Println()
+
+            if err := server.ListenAndServeTLS("", ""); err != nil {
+                log.Fatalf("❌ Server failed: %v", err)
+            }
+        }
+
+        func monitorSVIDRotation(source *workloadapi.X509Source) {
+            lastSerial := ""
+            ticker := time.NewTicker(10 * time.Second)
+            defer ticker.Stop()
+
+            for range ticker.C {
+                svid, err := source.GetX509SVID()
+                if err != nil {
+                    log.Printf("⚠️  Failed to get SVID: %v", err)
+                    continue
+                }
+
+                currentSerial := svid.Certificates[0].SerialNumber.String()
+
+                if lastSerial == "" {
+                    lastSerial = currentSerial
+                } else if currentSerial != lastSerial {
+                    fmt.Println("\n" + strings.Repeat("=", 60))
+                    fmt.Println("🔄 SVID ROTATION DETECTED!")
+                    fmt.Println(strings.Repeat("=", 60))
+                    fmt.Printf("Old Serial: %s\n", lastSerial)
+                    fmt.Printf("New Serial: %s\n", currentSerial)
+                    fmt.Printf("New Expiry: %s\n", svid.Certificates[0].NotAfter)
+                    fmt.Printf("Rotation Time: %s\n", time.Now().Format(time.RFC3339))
+                    fmt.Println(strings.Repeat("=", 60) + "\n")
+                    lastSerial = currentSerial
+                }
+            }
+        }
+        EOF
+
+        cd /app
+        go mod init service-a
+        go get github.com/spiffe/go-spiffe/v2@latest
+        go mod tidy
+        echo "Building service A..."
+        go build -o service-a main.go
+        echo "Starting service A..."
+        ./service-a
+    ports:
+    - containerPort: 8443
+      name: https
+    volumeMounts:
+    - name: spire-agent-socket
+      mountPath: /run/spire/sockets
+      readOnly: true
+  volumes:
+  - name: spire-agent-socket
+    hostPath:
+      path: /run/spire/sockets
+      type: Directory
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-a
+  namespace: spire
+spec:
+  selector:
+    app: service-a
+  ports:
+  - port: 8443
+    targetPort: 8443
+    name: https

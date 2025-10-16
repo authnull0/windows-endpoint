@@ -1,0 +1,11 @@
+{
+  "spiffe_id": "spiffe://authsec.dev/test-sdk-app",
+  "parent_id": "spiffe://authsec.dev/spire/agent/join_token/9f1ad98e-7f09-4903-ad31-0dfe772ce0d4",
+  "type": "application",
+  "selectors": [
+    "k8s:ns:spire",
+    "k8s:sa:default",
+    "k8s:pod-label:app:test-sdk"
+  ],
+  "register_with_spire": true
+}

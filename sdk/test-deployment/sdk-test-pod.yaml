@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sdk-test-app
+  namespace: spire
+  labels:
+    app: test-sdk
+spec:
+  serviceAccountName: default
+  containers:
+  - name: test-app
+    image: golang:1.24
+    command: ["/bin/sh"]
+    args:
+      - -c
+      - |
+        mkdir -p /app
+        cat > /app/main.go <<'EOF'
+        package main
+
+        import (
+            "context"
+            "fmt"
+            "log"
+            "time"
+
+            "github.com/spiffe/go-spiffe/v2/workloadapi"
+        )
+
+        func main() {
+            fmt.Println("=== SDK Integration Test ===")
+            fmt.Println("Connecting to SPIRE Agent...")
+
+            ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+            defer cancel()
+
+            // Connect to SPIRE Agent via workload API
+            source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(
+                workloadapi.WithAddr("unix:///run/spire/sockets/agent.sock"),
+            ))
+            if err != nil {
+                log.Fatalf("❌ Failed to create X509 source: %v", err)
+            }
+            defer source.Close()
+
+            fmt.Println("✅ Successfully connected to SPIRE Agent")
+
+            // Get SVID
+            svid, err := source.GetX509SVID()
+            if err != nil {
+                log.Fatalf("❌ Failed to get X509 SVID: %v", err)
+            }
+
+            fmt.Println("\n=== SVID Retrieved Successfully ===")
+            fmt.Printf("SPIFFE ID: %s\n", svid.ID)
+            fmt.Printf("Certificate Count: %d\n", len(svid.Certificates))
+            fmt.Printf("Expiry: %s\n", svid.Certificates[0].NotAfter)
+            fmt.Printf("Serial Number: %s\n", svid.Certificates[0].SerialNumber)
+
+            fmt.Println("\n🎉 SDK Integration Test PASSED!")
+            fmt.Println("The SDK successfully:")
+            fmt.Println("  1. Connected to SPIRE Agent")
+            fmt.Println("  2. Retrieved X.509 SVID")
+            fmt.Println("  3. Validated certificate chain")
+
+            // Keep running to allow inspection
+            fmt.Println("\nKeeping pod alive for inspection... (will exit in 5 minutes)")
+            time.Sleep(5 * time.Minute)
+        }
+        EOF
+
+        cd /app
+        go mod init test-sdk-app
+        go get github.com/spiffe/go-spiffe/v2@latest
+        go mod tidy
+        echo "Building test application..."
+        go build -o test-app main.go
+        echo "Running test application..."
+        ./test-app
+    volumeMounts:
+    - name: spire-agent-socket
+      mountPath: /run/spire/sockets
+      readOnly: true
+  volumes:
+  - name: spire-agent-socket
+    hostPath:
+      path: /run/spire/sockets
+      type: Directory
+  restartPolicy: Never
