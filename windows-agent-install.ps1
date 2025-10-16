@@ -970,7 +970,7 @@ else {
     # Dictionary to store the key-value pairs
     $envDict = @{}
 
-    foreach ($line in $envContent) {
+    //foreach ($line in $envContent) {
         if ($line -match "=") {
             # Split only on the first '=' to correctly parse the key-value pair
             $key, $value = $line -split "=", 2
