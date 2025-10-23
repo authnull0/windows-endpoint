@@ -1,9 +1,36 @@
 # Makefile for installing and uninstalling the PAM module
 
 PAM_MODULE=pam_authnull.so
-PAM_PATH=/lib/x86_64-linux-gnu/security/$(PAM_MODULE)
+PAM_PATH=/lib64/security/$(PAM_MODULE)
 SSHD_CONFIG=/etc/ssh/sshd_config
 PAM_FILE=/etc/pam.d/sshd
+# Detect OS dynamically
+OS_INFO := $(shell cat /etc/os-release 2>/dev/null)
+
+# Determine package manager and PAM path
+ifeq ($(shell echo "$(OS_INFO)" | grep -iE 'centos|rhel|rocky|alma'),)
+  ifeq ($(shell echo "$(OS_INFO)" | grep -i oracle),)
+    ifeq ($(shell echo "$(OS_INFO)" | grep -iE 'ubuntu|debian'),)
+      $(error Unknown OS detected. Please update Makefile.)
+    else
+      PAM_PATH := /lib/x86_64-linux-gnu/security/$(PAM_MODULE)
+      PKG_MANAGER := apt-get
+    endif
+  else
+      PAM_PATH := /lib64/security/$(PAM_MODULE)
+      SSHD_CONFIG := /etc/ssh/sshd_config
+      PKG_MANAGER := yum
+  endif
+else
+  PAM_PATH := /lib64/security/$(PAM_MODULE)
+  SSHD_CONFIG := /etc/ssh/sshd_config
+  PKG_MANAGER := yum
+endif
+
+# Print detected configuration
+$(info Detected Package Manager: $(PKG_MANAGER))
+$(info Detected PAM Path: $(PAM_PATH))
+$(info Detected SSHD Config: $(SSHD_CONFIG))
 
 
 # Installation: Configure and restart services
@@ -33,7 +60,7 @@ remove_pam:
 
 restore_sshd:
 	@echo "Restoring $(SSHD_CONFIG)..."
-	@sudo sed -i 's/^KbdInteractiveAuthentication yes/KbdInteractiveAuthentication no/' $(SSHD_CONFIG)
+	@sudo sed -i 's/^ChallengeResponseAuthentication yes/ChallengeResponseAuthentication no/' $(SSHD_CONFIG)
 	@sudo sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' $(SSHD_CONFIG)
 	@sudo sed -i '/AuthenticationMethods keyboard-interactive/d' $(SSHD_CONFIG)
 
