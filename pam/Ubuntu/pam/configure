@@ -50,11 +50,13 @@ detect_os() {
 }
 detect_os
 #Configure the sshd_config file
-echo "Configuring /etc/ssh/sshd_config..."
-
-if grep -q "^ChallengeResponseAuthentication no" /etc/ssh/sshd_config; then
-    sudo sed -i 's/^ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /etc/ssh/sshd_config
+# Ensure KbdInteractiveAuthentication is set to "yes", regardless of its current state
+if grep -Eq "^(#?\s*KbdInteractiveAuthentication\s+)" /etc/ssh/sshd_config; then
+    sudo sed -i "s/^#\?\s*KbdInteractiveAuthentication\s\+.*/KbdInteractiveAuthentication yes/" /etc/ssh/sshd_config
+else
+    echo "KbdInteractiveAuthentication yes" | sudo tee -a /etc/ssh/sshd_config
 fi
+echo "Updated /etc/ssh/sshd_config: KbdInteractiveAuthentication set to yes"
 
 # Ensure ChallengeResponseAuthentication is set to "yes", regardless of its current state
 if grep -Eq "^(#?\s*ChallengeResponseAuthentication\s+)" /etc/ssh/sshd_config; then
@@ -65,12 +67,18 @@ fi
 echo "Updated /etc/ssh/sshd_config: ChallengeResponseAuthentication set to yes"
 
 # Ensure PasswordAuthentication is set to "yes", regardless of its current state
-if grep -Eq "^(#?\s*PasswordAuthentication\s+)" /etc/ssh/sshd_config; then
-    sudo sed -i "s/^#\?\s*PasswordAuthentication\s\+.*/PasswordAuthentication yes/" /etc/ssh/sshd_config
-else
-    echo "PasswordAuthentication yes" | sudo tee -a /etc/ssh/sshd_config
+if [ "$PKG_MANAGER" = "yum" ]; then
+    #Forcefully replace any existing line (commented, uncommented, or wrong value)
+    sed -i "s/^\s*#\?\s*ChallengeResponseAuthentication\s\+.*/ChallengeResponseAuthentication yes/" "$SSHD_CONFIG"
+
+    #If grep returns 1 (false), it means the line was completely missing before the sed attempt.
+    if ! grep -q "^ChallengeResponseAuthentication yes" "$SSHD_CONFIG"; then
+        # If it's still not present, append it.
+        echo "ChallengeResponseAuthentication yes" | tee -a "$SSHD_CONFIG"
+    fi
+    echo "Updated /etc/ssh/sshd_config: ChallengeResponseAuthentication set to yes"
 fi
-echo "Updated /etc/ssh/sshd_config: PasswordAuthentication set to yes"
+
 
 if ! grep -q "AuthenticationMethods keyboard-interactive" /etc/ssh/sshd_config; then
     sudo sh -c 'echo "AuthenticationMethods keyboard-interactive" >> /etc/ssh/sshd_config'
