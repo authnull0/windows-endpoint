@@ -34,9 +34,7 @@ else
     PID_CHECK=$(pgrep -f "$SERVICE_NAME")
     if [[ -n "$PID_CHECK" ]]; then
         echo "$(date): $SERVICE_NAME restarted successfully (PID $PID_CHECK)."
-        send_mail "$SERVICE_NAME Restarted Successfully" "Service restarted successfully on $(hostname)."
     else
         echo "$(date): Failed to restart $SERVICE_NAME!"
-        send_mail "$SERVICE_NAME Restart FAILED" "Service failed to start on $(hostname). Please check manually."
     fi
 fi
