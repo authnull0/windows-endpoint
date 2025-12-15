@@ -23,7 +23,7 @@ if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
   rm -f authnull-db-agent
   echo -e "${GREEN}=> Downloading the agent file...${NC}${NORMAL}"
   rm -f authnull-db-agent
-  wget https://github.com/authnull0/database-agent/raw/refs/heads/linux-mysql-db-agent/src/authnull-db-agent
+  wget https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent
 
   # Make the agent file executable
   echo -e "${GREEN}\n=> Making script executable...${NC}${NORMAL}"
@@ -98,11 +98,30 @@ fi
 print_status "Updating package list..."
 apt-get update -y || print_error "Failed to update package list."
 
-# Install dependencies
 print_status "Installing dependencies..."
-apt-get install -y automake bzip2 cmake make g++ gcc git openssl libssl-dev libgnutls28-dev libtool patch uuid-dev \
-    zlib1g-dev nlohmann-json3-dev libicu-dev build-essential libmysqlclient-dev libevent-dev libjemalloc-dev || \
-    print_error "Failed to install dependencies."
+
+apt-get update -y && \
+apt-get install -y \
+    build-essential \
+    automake \
+    cmake \
+    make \
+    git \
+    pkg-config \
+    bzip2 \
+    patch \
+    libtool \
+    uuid-dev \
+    zlib1g-dev \
+    libevent-dev \
+    libjemalloc-dev \
+    libssl-dev \
+    libgnutls28-dev \
+    libicu-dev \
+    nlohmann-json3-dev \
+    default-libmysqlclient-dev \
+    mysql-client-core-8.0 \
+    || print_error "Failed to install dependencies."
 
 # Clone ProxySQL repository
 print_status "Cloning ProxySQL repository..."
@@ -117,7 +136,7 @@ fi
 
 # Checkout authsql branch
 print_status "Checking out authsql branch..."
-git checkout authsql || print_error "Failed to checkout authsql branch."
+git checkout authsql-postgres || print_error "Failed to checkout authsql branch."
 
 # Build ProxySQL
 print_status "Cleaning previous build..."
