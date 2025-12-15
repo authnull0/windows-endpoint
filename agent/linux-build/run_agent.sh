@@ -23,7 +23,7 @@ if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
   rm -f authnull-db-agent
   echo -e "${GREEN}=> Downloading the agent file...${NC}${NORMAL}"
   rm -f authnull-db-agent
-  wget https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent
+  wget https://github.com/authnull0/database-agent/raw/refs/heads/checkout_job/authnull-db-agent
 
   # Make the agent file executable
   echo -e "${GREEN}\n=> Making script executable...${NC}${NORMAL}"
@@ -136,7 +136,7 @@ fi
 
 # Checkout authsql branch
 print_status "Checking out authsql branch..."
-git checkout authsql-postgres || print_error "Failed to checkout authsql branch."
+git checkout authsql || print_error "Failed to checkout authsql branch."
 
 # Build ProxySQL
 print_status "Cleaning previous build..."
