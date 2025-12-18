@@ -191,7 +191,7 @@ cat >> /etc/proxysql.cnf << EOL
 
 authnull =
 {
-    org_id = 105
+    org_id = 183
     tenant_id = 1
     api_url = "https://prod.api.authnull.com/authnull0/api/v1/authn/v3/do-authenticationV4"
 }
