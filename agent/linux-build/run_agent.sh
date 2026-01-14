@@ -12,15 +12,55 @@ BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
 # Working directory
-dir="/var/opt/authnull-db-agent"
-mkdir -p $dir
-cd $dir
+dir="/opt/authnull-db-agent"
+service_name=database_agent.service
+service_src="$dir/$service_name"
+service_dst="/etc/systemd/system/$service_name"
+
+
+if [ ! -d "$dir" ]; then
+    echo "Directory does not exist. Creating: $dir"
+    mkdir -p "$dir"
+else
+    echo "Directory already exists: $dir"
+fi
+
+cd "$dir" || exit 1
+
+
+# Check if running as root or with sudo
+if [ "$EUID" -ne 0 ]; then
+    echo "This script must be run as root or with sudo."
+    exit 1
+fi
+
+#Check SSP Agent running Status 
+
+db_agent_status() {
+    echo "Checking if $service_name is already running"
+    if pgrep -x "$service_name" >/dev/null; then
+        echo "Process $service_name is running."
+        return 0  # success means running
+    else 
+        echo "Process $service_name is not running"
+        return 1 # failure means not running 
+    fi
+}
+
 
 if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
 
   rm -rf ./*
   # Download the agent file
   rm -f authnull-db-agent
+  # Stop the existing agent if running
+  if db_agent_status; then
+    echo -e "${YELLOW}=> Stopping existing agent service...${NC}${NORMAL}"
+    sudo systemctl stop database_agent.service || echo "Service not running, continuing..."
+    sudo systemctl disable database_agent.service || echo "Service not enabled, continuing..."
+    sudo systemctl daemon-reload
+  fi
+
   echo -e "${GREEN}=> Downloading the agent file...${NC}${NORMAL}"
   rm -f authnull-db-agent
   wget https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent
@@ -59,20 +99,31 @@ if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
 
   # Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
-  sudo rm -f run_agent.service
-  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/DATAB-9/agent/linux-build/run_agent.service
-  sed -i "6 i ExecStart=$dir/authnull-db-agent" run_agent.service
-  sed -i "6 i WorkingDirectory=$dir" run_agent.service
-  sed -i "6 i User=root" run_agent.service
-  sudo mv run_agent.service /etc/systemd/system/
-  sudo systemctl enable run_agent.service
-
+  sudo rm -f database_agent.service
+  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/DATAB-9/agent/linux-build/database_agent.service
+  
+# Check if /etc/systemd/system is writable
+if [ -w /etc/systemd/system ]; then
+    echo "/etc/systemd/system is writable"
+    sudo mv database_agent.service /etc/systemd/system/
+    echo "Service file moved to /etc/systemd/system/database_agent.service"
+else
+    echo "/etc/systemd/system is NOT writable"
+    # Create symlink
+    if [ ! -L "$service_dst" ]; then
+        sudo ln -s "$service_src" "$service_dst"
+        echo "Symlink created: $service_dst → $service_src"
+    else
+        echo "Symlink already exists"
+    fi
 fi
-
+  
+fi
 # Enable systemd service for the agent
 sudo systemctl daemon-reload
-sudo systemctl stop run_agent.service
-sudo systemctl start run_agent.service
+sudo systemctl stop database_agent.service
+sudo systemctl start database_agent.service
+sudo systemctl enable database_agent.service
 
 echo -e "${GREEN}=> Successfully started systemd service for the agent${NC}${NORMAL}"
 cd -
@@ -88,11 +139,6 @@ print_error() {
     echo -e "${RED}[-] ERROR: $1${NC}"
     exit 1
 }
-
-# Check if running as root or with sudo
-if [ "$EUID" -ne 0 ]; then
-    print_error "This script must be run as root or with sudo."
-fi
 
 # Update package list
 print_status "Updating package list..."
