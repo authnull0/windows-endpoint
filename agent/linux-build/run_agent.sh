@@ -100,7 +100,7 @@ if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
   # Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
   sudo rm -f database_agent.service
-  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/DATAB-9/agent/linux-build/database_agent.service
+  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/postgres-db-agent/agent/linux-build/database_agent.service
   
 # Check if /etc/systemd/system is writable
 if [ -w /etc/systemd/system ]; then
