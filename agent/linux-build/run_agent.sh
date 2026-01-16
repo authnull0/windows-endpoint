@@ -14,7 +14,7 @@ NORMAL=$(tput sgr0)
 # Working directory
 dir="/opt/authnull-db-agent"
 service_binary="authnull-db-agent"
-service_name="authnull-db-agent.service"
+service_name="db-agent.service"
 service_src="$dir/$service_name"
 service_dst="/etc/systemd/system/$service_name"
 env_file="$dir/db.env"
@@ -41,8 +41,8 @@ agent_status() {
   echo -e "${YELLOW}=> Checking for existing agent service...${NC}${NORMAL}"
   if agent_status "$service_binary"; then
     echo -e "${YELLOW}=> Stopping existing agent service...${NC}${NORMAL}"
-    sudo systemctl stop authnull-db-agent.service || echo "Service not running, continuing..."
-    sudo systemctl disable authnull-db-agent.service || echo "Service not enabled, continuing..."
+    sudo systemctl stop db-agent.service || echo "Service not running, continuing..."
+    sudo systemctl disable db-agent.service || echo "Service not enabled, continuing..."
     sudo systemctl daemon-reload
   fi
   if [ ! -d "$dir" ]; then
@@ -104,14 +104,14 @@ agent_status() {
 
   # Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
-  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/SERVI-412/agent/linux-build/authnull-db-agent.service
+  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/SERVI-412/agent/linux-build/db-agent.service
   
 # Check if /etc/systemd/system is writable
 if [ -w /etc/systemd/system ]; then
     echo "/etc/systemd/system is writable"
-    sudo mv authnull-db-agent.service /etc/systemd/system/
-    echo "Service file moved to /etc/systemd/system/authnull-db-agent.service"
-    sudo chmod 644 /etc/systemd/system/authnull-db-agent.service
+    sudo mv db-agent.service /etc/systemd/system/
+    echo "Service file moved to /etc/systemd/system/db-agent.service"
+    sudo chmod 644 /etc/systemd/system/db-agent.service
 else
     echo "/etc/systemd/system is NOT writable"
     # Create symlink
@@ -125,8 +125,8 @@ else
 fi
   
 # Enable systemd service for the agent
-sudo systemctl daemon-reload
 echo -e "${GREEN}=> Enabling and starting the agent service...${NC}${NORMAL}"
+sudo systemctl daemon-reload
 sudo systemctl start authnull-db-agent
 sudo systemctl enable authnull-db-agent
 
