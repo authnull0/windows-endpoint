@@ -12,26 +12,58 @@ BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
 # Working directory
-dir="/var/opt/authnull-db-agent"
-mkdir -p $dir
-cd $dir
+dir="/opt/authnull-db-agent"
+service_binary="db-agent"
+service_name="db-agent.service"
+service_src="$dir/$service_name"
+service_dst="/etc/systemd/system/$service_name"
+env_file="$dir/db.env"
 
-if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
+# Check if running as root or with sudo
+if [ "$EUID" -ne 0 ]; then
+    echo "This script must be run as root or with sudo."
+    exit 1
+fi
+#Check Agent running Status 
+agent_status() {
+    local svc="$1"
+    echo "Checking if $svc is already running"
+    if pgrep -f "$svc" >/dev/null; then
+        echo "Process $svc is running."
+        return 0  # success means running
+    else 
+        echo "Process $svc is not running"
+        return 1 # failure means not running 
+    fi
+}
 
-  rm -rf ./*
-  # Download the agent file
-  rm -f authnull-db-agent
+  # Stop the existing agent if running
+  echo -e "${YELLOW}=> Checking for existing agent service...${NC}${NORMAL}"
+  if agent_status "$service_binary"; then
+    echo -e "${YELLOW}=> Stopping existing agent service...${NC}${NORMAL}"
+    sudo systemctl stop db-agent.service || echo "Service not running, continuing..."
+    sudo systemctl disable db-agent.service || echo "Service not enabled, continuing..."
+    sudo systemctl daemon-reload
+  fi
+  if [ ! -d "$dir" ]; then
+    echo "Directory does not exist. Creating: $dir"
+    mkdir -p "$dir"
+    cd "$dir" || exit 1
+  else
+    echo "Directory already exists: $dir"
+    cd "$dir" || exit 1
+    echo -e "${YELLOW}=> Cleaning up existing files...${NC}${NORMAL}"    
+    rm -rf ./*    
+  fi
+  
   echo -e "${GREEN}=> Downloading the agent file...${NC}${NORMAL}"
-  rm -f authnull-db-agent
-  wget https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent
+  wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent
 
   # Make the agent file executable
   echo -e "${GREEN}\n=> Making script executable...${NC}${NORMAL}"
-  chmod +x authnull-db-agent
+  chmod +x db-agent
   echo -e "${GREEN}=> Done\n${NC}${NORMAL}"
-
-  # db.env input prompt
-  rm -f db.env
+  # Prompt user to input content for db.env
   echo -e "${GREEN}Please enter the content for the db.env file. End with an empty line or Ctrl+D:${NC}${NORMAL}"
 
   # Initialize an empty string to store the content
@@ -50,31 +82,64 @@ if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
   # sudo echo -n "$db_env_content" > db.env
   echo "$db_env_content" | tee -a db.env
 
-  # Prompt for host, username, password and mode of operation
-  echo -en "${BOLD}${YELLOW}=> Enter host${BLUE}: ${NORMAL}${NC}" ; read host; echo "DB_HOST=$host" | tee -a db.env
-  echo -en "${BOLD}${YELLOW}=> Enter username${BLUE}: ${NORMAL}${NC}" ; read username; echo "DB_USER=$username" | tee -a db.env
-  echo -en "${BOLD}${YELLOW}=> Enter password${BLUE}: ${NORMAL}${NC}" ; read password; echo "DB_PASSWORD=$password" | tee -a db.env
+  # Prompt for host
+  echo -en "${BOLD}${YELLOW}=> Enter host${BLUE}: ${NORMAL}${NC}"
+  read -r host
+  host="$(echo "$host" | xargs)"
+  echo "DB_HOST=$host" | tee -a db.env
 
-  source db.env
+  # Prompt for username
+  echo -en "${BOLD}${YELLOW}=> Enter username${BLUE}: ${NORMAL}${NC}"
+  read -r username
+  username="$(echo "$username" | xargs)"
+  echo "DB_USER=$username" | tee -a db.env
+  # Prompt for password (hidden input)
+echo -en "${BOLD}${YELLOW}=> Enter password${BLUE}: ${NORMAL}${NC}"
+read -s password
+echo
+
+# Remove existing entry if present (optional but recommended)
+sed -i '/^DB_PASSWORD=/d' db.env 2>/dev/null
+
+# Write password silently
+printf 'DB_PASSWORD=%s\n' "$password" >> db.env
+
 
   # Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
-  sudo rm -f run_agent.service
-  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/DATAB-9/agent/linux-build/run_agent.service
-  sed -i "6 i ExecStart=$dir/authnull-db-agent" run_agent.service
-  sed -i "6 i WorkingDirectory=$dir" run_agent.service
-  sed -i "6 i User=root" run_agent.service
-  sudo mv run_agent.service /etc/systemd/system/
-  sudo systemctl enable run_agent.service
-
+  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/postgres-db-agent/agent/linux-build/db-agent.service
+  
+# Check if /etc/systemd/system is writable
+if [ -w /etc/systemd/system ]; then
+    echo "/etc/systemd/system is writable"
+    sudo mv db-agent.service /etc/systemd/system/
+    echo "Service file moved to /etc/systemd/system/db-agent.service"
+    sudo chmod 644 /etc/systemd/system/db-agent.service
+else
+    echo "/etc/systemd/system is NOT writable"
+    # Create symlink
+    if [ ! -L "$service_dst" ]; then
+        sudo ln -s "$service_src" "$service_dst"
+        echo "Symlink created: $service_dst → $service_src"
+        sudo chmod 644 "$service_dst"
+    else
+        echo "Symlink already exists"
+    fi
 fi
-
+  
 # Enable systemd service for the agent
+echo -e "${GREEN}=> Enabling and starting the agent service...${NC}${NORMAL}"
 sudo systemctl daemon-reload
-sudo systemctl stop run_agent.service
-sudo systemctl start run_agent.service
+sudo systemctl start db-agent
+sudo systemctl enable db-agent
 
-echo -e "${GREEN}=> Successfully started systemd service for the agent${NC}${NORMAL}"
+# Verify if the agent service is running
+if agent_status "$service_binary"; then
+    echo -e "${GREEN}=> Agent service is running successfully.${NC}${NORMAL}"
+else
+    echo -e "${RED}=> ERROR: Agent service failed to start.${NC}${NORMAL}"
+    exit 1
+fi
 cd -
 
 # BEGIN PROXYSQL INSTALLATION
@@ -88,11 +153,13 @@ print_error() {
     echo -e "${RED}[-] ERROR: $1${NC}"
     exit 1
 }
+# check if proxyqsql is already installed
+if command -v proxysql >/dev/null 2>&1; then
+    print_status "ProxySQL is already installed. Exiting downloading installation."
+    print_status "Continuing with configuration."
 
-# Check if running as root or with sudo
-if [ "$EUID" -ne 0 ]; then
-    print_error "This script must be run as root or with sudo."
-fi
+else
+    print_status "ProxySQL is not installed. Proceeding with installation."
 
 # Update package list
 print_status "Updating package list..."
@@ -122,7 +189,16 @@ apt-get install -y \
     default-libmysqlclient-dev \
     mysql-client-core-8.0 \
     || print_error "Failed to install dependencies."
-
+fi
+# check if proxysql service is already running
+if agent_status proxysql; then
+    print_status "ProxySQL service is already running. Exiting installation."
+    echo "Stopping existing ProxySQL service..."
+    sudo systemctl stop proxysql || print_error "Failed to stop existing ProxySQL service."
+    sudo systemctl disable proxysql || print_error "Failed to disable existing ProxySQL service."
+else
+    print_status "ProxySQL service is not running. Proceeding with configuration."
+fi
 # Clone ProxySQL repository
 print_status "Cloning ProxySQL repository..."
 if [ -d "proxysql-v3-alpha" ]; then
@@ -162,6 +238,8 @@ fi
 
 # Create systemd service file
 print_status "Setting up systemd service file..."
+if [ -w /usr/lib/systemd/system ]; then
+print_status "/usr/lib/systemd/system is writable"
 cat > /usr/lib/systemd/system/proxysql.service << EOL
 [Unit]
 Description=High Performance Advanced Proxy for MySQL
@@ -179,6 +257,11 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOL
 [ $? -eq 0 ] || print_error "Failed to create systemd service file."
+else
+    echo "/usr/lib/systemd/system is NOT writable"
+    echo "Cannot create systemd service file."
+    print_error "ProxySQL service file creation failed."
+fi
 
 # Set up configuration file and permissions
 print_status "Configuring /etc/proxysql.cnf..."
@@ -186,13 +269,26 @@ if [ ! -f "/etc/proxysql.cnf" ]; then
     touch /etc/proxysql.cnf || print_error "Failed to create /etc/proxysql.cnf."
 fi
 
+if [ ! -f "$env_file" ]; then
+    print_error "Environment file not found: $env_file"
+fi
+
+# Export variables from env file
+set -a
+source "$env_file"
+set +a
+if [ -z "$ORG_ID" ] || [ -z "$TENANT_ID" ]; then
+    print_error "ORG_ID or TENANT_ID not set in $env_file"
+fi
+
+
 # Add authnull section to proxysql.cnf
 cat >> /etc/proxysql.cnf << EOL
 
 authnull =
 {
-    org_id = 183
-    tenant_id = 1
+    org_id = $ORG_ID
+    tenant_id = $TENANT_ID
     api_url = "https://prod.api.authnull.com/authnull0/api/v1/authn/v3/do-authenticationV4"
 }
 EOL
@@ -226,3 +322,10 @@ systemctl enable proxysql || print_error "Failed to enable proxysql service."
 
 print_status "ProxySQL setup completed successfully!"
 echo "You can check the status with: systemctl status proxysql"
+
+if agent_status proxysql; then
+    print_status "ProxySQL service is running successfully."
+else
+    print_error "ERROR: ProxySQL service failed to start."
+    exit 1
+fi

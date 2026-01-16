@@ -1,8 +1,12 @@
 [Unit]
 Description=Agent Daemon
+After=network.target
 
 [Service]
 Type=simple
+ExecStart=/opt/authnull-db-agent/db-agent
+WorkingDirectory=/opt/authnull-db-agent
+User=root
 Restart=on-failure
 StartLimitBurst=2
 
