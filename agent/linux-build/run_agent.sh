@@ -153,13 +153,6 @@ print_error() {
     echo -e "${RED}[-] ERROR: $1${NC}"
     exit 1
 }
-# check if proxyqsql is already installed
-if command -v proxysql >/dev/null 2>&1; then
-    print_status "ProxySQL is already installed. Exiting downloading installation."
-    print_status "Continuing with configuration."
-
-else
-    print_status "ProxySQL is not installed. Proceeding with installation."
 
 # Update package list
 print_status "Updating package list..."
@@ -188,11 +181,12 @@ apt-get install -y \
     nlohmann-json3-dev \
     default-libmysqlclient-dev \
     mysql-client-core-8.0 \
+    postgresql \
+    postgresql-contrib \
     || print_error "Failed to install dependencies."
-fi
 # check if proxysql service is already running
 if agent_status proxysql; then
-    print_status "ProxySQL service is already running. Exiting installation."
+    print_status "ProxySQL service is already running"
     echo "Stopping existing ProxySQL service..."
     sudo systemctl stop proxysql || print_error "Failed to stop existing ProxySQL service."
     sudo systemctl disable proxysql || print_error "Failed to disable existing ProxySQL service."
@@ -329,3 +323,14 @@ else
     print_error "ERROR: ProxySQL service failed to start."
     exit 1
 fi
+# Restart db agent once again to ensure connectivity to proxysql
+print_status "Restarting db-agent service to ensure connectivity to ProxySQL..."
+systemctl restart db-agent || print_error "Failed to restart db-agent service."
+if agent_status "$service_binary"; then
+    print_status "db-agent service is running successfully."
+else
+    print_error "ERROR: db-agent service failed to start after ProxySQL installation."
+    exit 1
+fi
+print_status "All services are up and running."
+print_status "Database Agent Installation and Setup completed successfully."
