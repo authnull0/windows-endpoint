@@ -125,10 +125,11 @@ else
 fi
   
 # Enable systemd service for the agent
+sudo systemctl daemon-reload
 echo -e "${GREEN}=> Enabling and starting the agent service...${NC}${NORMAL}"
 sudo systemctl start authnull-db-agent
 sudo systemctl enable authnull-db-agent
-sudo systemctl daemon-reload
+
 # Verify if the agent service is running
 if agent_status "$service_binary"; then
     echo -e "${GREEN}=> Agent service is running successfully.${NC}${NORMAL}"
