@@ -111,12 +111,14 @@ if [ -w /etc/systemd/system ]; then
     echo "/etc/systemd/system is writable"
     sudo mv authnull-db-agent.service /etc/systemd/system/
     echo "Service file moved to /etc/systemd/system/authnull-db-agent.service"
+    sudo chmod 644 /etc/systemd/system/authnull-db-agent.service
 else
     echo "/etc/systemd/system is NOT writable"
     # Create symlink
     if [ ! -L "$service_dst" ]; then
         sudo ln -s "$service_src" "$service_dst"
         echo "Symlink created: $service_dst → $service_src"
+        sudo chmod 644 "$service_dst"
     else
         echo "Symlink already exists"
     fi
