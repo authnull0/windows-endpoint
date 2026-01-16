@@ -93,17 +93,21 @@ agent_status() {
   read -r username
   username="$(echo "$username" | xargs)"
   echo "DB_USER=$username" | tee -a db.env
-
   # Prompt for password (hidden input)
-  echo -en "${BOLD}${YELLOW}=> Enter password${BLUE}: ${NORMAL}${NC}"
-  read -s -p  password
-  echo
-  printf 'DB_PASSWORD=%s\n' "$password" >> db.env
+echo -en "${BOLD}${YELLOW}=> Enter password${BLUE}: ${NORMAL}${NC}"
+read -s password
+echo
+
+# Remove existing entry if present (optional but recommended)
+sed -i '/^DB_PASSWORD=/d' db.env 2>/dev/null
+
+# Write password silently
+printf 'DB_PASSWORD=%s\n' "$password" >> db.env
 
 
   # Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
-  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/SERVI-412/agent/linux-build/db-agent.service
+  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/postgres-db-agent/agent/linux-build/db-agent.service
   
 # Check if /etc/systemd/system is writable
 if [ -w /etc/systemd/system ]; then
@@ -126,8 +130,8 @@ fi
 # Enable systemd service for the agent
 echo -e "${GREEN}=> Enabling and starting the agent service...${NC}${NORMAL}"
 sudo systemctl daemon-reload
-sudo systemctl start authnull-db-agent
-sudo systemctl enable authnull-db-agent
+sudo systemctl start db-agent
+sudo systemctl enable db-agent
 
 # Verify if the agent service is running
 if agent_status "$service_binary"; then
@@ -151,8 +155,8 @@ print_error() {
 }
 # check if proxyqsql is already installed
 if command -v proxysql >/dev/null 2>&1; then
-    print_status "ProxySQL is already installed. Exiting installation."
-    exit 0
+    print_status "ProxySQL is already installed. Exiting downloading installation."
+    print_status "Continuing with configuration."
 
 else
     print_status "ProxySQL is not installed. Proceeding with installation."
