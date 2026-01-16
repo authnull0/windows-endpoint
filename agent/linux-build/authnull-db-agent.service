@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/authnull-db-agent
-WorkingDirectory=/opt
+ExecStart=/opt/authnull-db-agent/authnull-db-agent
+WorkingDirectory=/opt/authnull-db-agent
 User=root
 Restart=on-failure
 StartLimitBurst=2

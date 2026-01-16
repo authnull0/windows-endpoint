@@ -13,54 +13,49 @@ NORMAL=$(tput sgr0)
 
 # Working directory
 dir="/opt/authnull-db-agent"
-service_name=authnull-db-agent.service
+service_binary="authnull-db-agent"
+service_name="authnull-db-agent.service"
 service_src="$dir/$service_name"
 service_dst="/etc/systemd/system/$service_name"
 env_file="$dir/db.env"
-
-
-if [ ! -d "$dir" ]; then
-    echo "Directory does not exist. Creating: $dir"
-    mkdir -p "$dir"
-else
-    echo "Directory already exists: $dir"
-fi
-
-cd "$dir" || exit 1
-
 
 # Check if running as root or with sudo
 if [ "$EUID" -ne 0 ]; then
     echo "This script must be run as root or with sudo."
     exit 1
 fi
-
-#Check SSP Agent running Status 
-
+#Check Agent running Status 
 agent_status() {
     local svc="$1"
-    echo "Checking if $service_name is already running"
-    if pgrep -x "$service_name" >/dev/null; then
-        echo "Process $service_name is running."
+    echo "Checking if $svc is already running"
+    if pgrep -x "$svc" >/dev/null; then
+        echo "Process $svc is running."
         return 0  # success means running
     else 
-        echo "Process $service_name is not running"
+        echo "Process $svc is not running"
         return 1 # failure means not running 
     fi
 }
 
-
-if [ ! -f "authnull-db-agent" ] || [ ! -f "db.env" ]; then
-  echo -e "${YELLOW}=> Cleaning up existing files...${NC}${NORMAL}"    
-  rm -rf ./*
   # Stop the existing agent if running
-  if agent_status "$service_name"; then
+  echo -e "${YELLOW}=> Checking for existing agent service...${NC}${NORMAL}"
+  if agent_status "$service_binary"; then
     echo -e "${YELLOW}=> Stopping existing agent service...${NC}${NORMAL}"
     sudo systemctl stop authnull-db-agent.service || echo "Service not running, continuing..."
     sudo systemctl disable authnull-db-agent.service || echo "Service not enabled, continuing..."
     sudo systemctl daemon-reload
   fi
-
+  if [ ! -d "$dir" ]; then
+    echo "Directory does not exist. Creating: $dir"
+    mkdir -p "$dir"
+    cd "$dir" || exit 1
+  else
+    echo "Directory already exists: $dir"
+    cd "$dir" || exit 1
+    echo -e "${YELLOW}=> Cleaning up existing files...${NC}${NORMAL}"    
+    rm -rf ./*    
+  fi
+  
   echo -e "${GREEN}=> Downloading the agent file...${NC}${NORMAL}"
   rm -f authnull-db-agent
   wget https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent
@@ -127,13 +122,13 @@ else
     fi
 fi
   
-fi
 # Enable systemd service for the agent
+echo -e "${GREEN}=> Enabling and starting the agent service...${NC}${NORMAL}"
+sudo systemctl start authnull-db-agent
+sudo systemctl enable authnull-db-agent
 sudo systemctl daemon-reload
-sudo systemctl start authnull-db-agent.service
-sudo systemctl enable authnull-db-agent.service
 # Verify if the agent service is running
-if agent_status "$service_name"; then
+if agent_status "$service_binary"; then
     echo -e "${GREEN}=> Agent service is running successfully.${NC}${NORMAL}"
 else
     echo -e "${RED}=> ERROR: Agent service failed to start.${NC}${NORMAL}"
