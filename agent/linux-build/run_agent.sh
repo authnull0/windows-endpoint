@@ -13,7 +13,7 @@ NORMAL=$(tput sgr0)
 
 # Working directory
 dir="/opt/authnull-db-agent"
-service_binary="authnull-db-agent"
+service_binary="db-agent"
 service_name="db-agent.service"
 service_src="$dir/$service_name"
 service_dst="/etc/systemd/system/$service_name"
@@ -28,7 +28,7 @@ fi
 agent_status() {
     local svc="$1"
     echo "Checking if $svc is already running"
-    if pgrep -x "$svc" >/dev/null; then
+    if pgrep -f "$svc" >/dev/null; then
         echo "Process $svc is running."
         return 0  # success means running
     else 
@@ -57,12 +57,11 @@ agent_status() {
   fi
   
   echo -e "${GREEN}=> Downloading the agent file...${NC}${NORMAL}"
-  rm -f authnull-db-agent
-  wget https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent
+  wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent
 
   # Make the agent file executable
   echo -e "${GREEN}\n=> Making script executable...${NC}${NORMAL}"
-  chmod +x authnull-db-agent
+  chmod +x db-agent
   echo -e "${GREEN}=> Done\n${NC}${NORMAL}"
   # Prompt user to input content for db.env
   echo -e "${GREEN}Please enter the content for the db.env file. End with an empty line or Ctrl+D:${NC}${NORMAL}"
@@ -97,10 +96,10 @@ agent_status() {
 
   # Prompt for password (hidden input)
   echo -en "${BOLD}${YELLOW}=> Enter password${BLUE}: ${NORMAL}${NC}"
-  read -rs password
+  read -s -p  password
   echo
-  password="$(echo "$password" | xargs)"
-  echo "DB_PASSWORD=$password" | tee -a db.env
+  printf 'DB_PASSWORD=%s\n' "$password" >> db.env
+
 
   # Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
@@ -150,6 +149,13 @@ print_error() {
     echo -e "${RED}[-] ERROR: $1${NC}"
     exit 1
 }
+# check if proxyqsql is already installed
+if command -v proxysql >/dev/null 2>&1; then
+    print_status "ProxySQL is already installed. Exiting installation."
+    exit 0
+
+else
+    print_status "ProxySQL is not installed. Proceeding with installation."
 
 # Update package list
 print_status "Updating package list..."
@@ -179,7 +185,16 @@ apt-get install -y \
     default-libmysqlclient-dev \
     mysql-client-core-8.0 \
     || print_error "Failed to install dependencies."
-
+fi
+# check if proxysql service is already running
+if agent_status proxysql; then
+    print_status "ProxySQL service is already running. Exiting installation."
+    echo "Stopping existing ProxySQL service..."
+    sudo systemctl stop proxysql || print_error "Failed to stop existing ProxySQL service."
+    sudo systemctl disable proxysql || print_error "Failed to disable existing ProxySQL service."
+else
+    print_status "ProxySQL service is not running. Proceeding with configuration."
+fi
 # Clone ProxySQL repository
 print_status "Cloning ProxySQL repository..."
 if [ -d "proxysql-v3-alpha" ]; then
