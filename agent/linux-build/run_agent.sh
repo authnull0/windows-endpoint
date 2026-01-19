@@ -65,6 +65,17 @@ agent_status() {
   echo -e "${GREEN}=> Done\n${NC}${NORMAL}"
   # Prompt user to input content for db.env
   echo -e "${GREEN}Please enter the content for the db.env file. End with an empty line or Ctrl+D:${NC}${NORMAL}"
+  echo -e "${YELLOW}Required fields: ORG_ID, TENANT_ID, DB_TYPE, DB_PORT, TIME_INTERVAL, API, KEY, MACHINE_KEY${NC}${NORMAL}"
+  echo -e "${YELLOW}Example:${NC}"
+  echo -e "ORG_ID=1"
+  echo -e "TENANT_ID=1"
+  echo -e "DB_TYPE=postgres"
+  echo -e "DB_PORT=5432"
+  echo -e "TIME_INTERVAL=1"
+  echo -e "API=https://prod.api.authnull.com"
+  echo -e "KEY=your-key"
+  echo -e "MACHINE_KEY=AGENT01"
+  echo ""
 
   # Initialize an empty string to store the content
   db_env_content=""
@@ -82,27 +93,125 @@ agent_status() {
   # sudo echo -n "$db_env_content" > db.env
   echo "$db_env_content" | tee -a db.env
 
-  # Prompt for host
-  echo -en "${BOLD}${YELLOW}=> Enter host${BLUE}: ${NORMAL}${NC}"
-  read -r host
-  host="$(echo "$host" | xargs)"
-  echo "DB_HOST=$host" | tee -a db.env
+  # Get this agent VM's IP address for multi-host mode
+  echo -e "${GREEN}=> Detecting Agent VM IP address...${NC}${NORMAL}"
+  agent_vm_ip=$(hostname -I | awk '{print $1}')
+  echo -e "${YELLOW}Detected IP: $agent_vm_ip${NC}"
+  echo -en "${BOLD}${YELLOW}=> Confirm Agent VM IP (press Enter to use $agent_vm_ip or type new IP)${BLUE}: ${NORMAL}${NC}"
+  read -r custom_ip
+  if [ -n "$custom_ip" ]; then
+    agent_vm_ip="$(echo "$custom_ip" | xargs)"
+  fi
+  echo "AGENT_VM_IP=$agent_vm_ip" | tee -a db.env
 
-  # Prompt for username
-  echo -en "${BOLD}${YELLOW}=> Enter username${BLUE}: ${NORMAL}${NC}"
-  read -r username
-  username="$(echo "$username" | xargs)"
-  echo "DB_USER=$username" | tee -a db.env
-  # Prompt for password (hidden input)
-echo -en "${BOLD}${YELLOW}=> Enter password${BLUE}: ${NORMAL}${NC}"
-read -s password
-echo
+  # Multi-host configuration
+  echo ""
+  echo -e "${GREEN}========================================${NC}"
+  echo -e "${GREEN}  MULTI-HOST DATABASE CONFIGURATION${NC}"
+  echo -e "${GREEN}========================================${NC}"
+  echo -e "${YELLOW}This agent can manage multiple database hosts.${NC}"
+  echo -e "${YELLOW}You will be prompted to add database hosts one by one.${NC}"
+  echo ""
 
-# Remove existing entry if present (optional but recommended)
-sed -i '/^DB_PASSWORD=/d' db.env 2>/dev/null
+  # Initialize hosts JSON file
+  hosts_file="$dir/db_hosts.json"
+  echo '{"hosts":[]}' > "$hosts_file"
 
-# Write password silently
-printf 'DB_PASSWORD=%s\n' "$password" >> db.env
+  host_count=0
+  add_more="y"
+
+  while [[ "$add_more" =~ ^[Yy]$ ]]; do
+    host_count=$((host_count + 1))
+    echo ""
+    echo -e "${GREEN}--- Database Host #$host_count ---${NC}"
+
+    # Prompt for host VM IP
+    echo -en "${BOLD}${YELLOW}=> Enter Database Host VM IP${BLUE}: ${NORMAL}${NC}"
+    read -r host_vm_ip
+    host_vm_ip="$(echo "$host_vm_ip" | xargs)"
+
+    # Prompt for port (default 5432)
+    echo -en "${BOLD}${YELLOW}=> Enter Database Port (default: 5432)${BLUE}: ${NORMAL}${NC}"
+    read -r db_port
+    db_port="$(echo "$db_port" | xargs)"
+    if [ -z "$db_port" ]; then
+      db_port="5432"
+    fi
+
+    # Prompt for username
+    echo -en "${BOLD}${YELLOW}=> Enter Database Admin Username${BLUE}: ${NORMAL}${NC}"
+    read -r username
+    username="$(echo "$username" | xargs)"
+
+    # Prompt for password (hidden input)
+    echo -en "${BOLD}${YELLOW}=> Enter Database Admin Password${BLUE}: ${NORMAL}${NC}"
+    read -s password
+    echo
+
+    # Add host to JSON file using jq or manual JSON construction
+    if command -v jq &> /dev/null; then
+      # Use jq if available
+      jq --arg ip "$host_vm_ip" --arg port "$db_port" --arg user "$username" --arg pass "$password" \
+        '.hosts += [{"host_vm_ip": $ip, "port": $port, "username": $user, "password": $pass}]' \
+        "$hosts_file" > "${hosts_file}.tmp" && mv "${hosts_file}.tmp" "$hosts_file"
+    else
+      # Manual JSON construction if jq is not available
+      if [ $host_count -eq 1 ]; then
+        echo "{\"hosts\":[{\"host_vm_ip\":\"$host_vm_ip\",\"port\":\"$db_port\",\"username\":\"$username\",\"password\":\"$password\"}]}" > "$hosts_file"
+      else
+        # Append to existing hosts array
+        sed -i "s/\]}$/,{\"host_vm_ip\":\"$host_vm_ip\",\"port\":\"$db_port\",\"username\":\"$username\",\"password\":\"$password\"}]}/" "$hosts_file"
+      fi
+    fi
+
+    echo -e "${GREEN}✓ Host #$host_count added: $host_vm_ip:$db_port${NC}"
+
+    # Ask if user wants to add more hosts
+    echo ""
+    echo -en "${BOLD}${YELLOW}=> Add another database host? (y/n)${BLUE}: ${NORMAL}${NC}"
+    read -r add_more
+  done
+
+  echo ""
+  echo -e "${GREEN}Total hosts configured: $host_count${NC}"
+
+  # Set permissions on hosts file (contains passwords)
+  chmod 600 "$hosts_file"
+
+  # For backward compatibility, also set the first host as DB_HOST, DB_USER, DB_PASSWORD
+  # This allows the agent to work in single-host mode if needed
+  if [ $host_count -ge 1 ]; then
+    if command -v jq &> /dev/null; then
+      first_host=$(jq -r '.hosts[0].host_vm_ip' "$hosts_file")
+      first_user=$(jq -r '.hosts[0].username' "$hosts_file")
+      first_pass=$(jq -r '.hosts[0].password' "$hosts_file")
+    else
+      # Parse manually (basic extraction)
+      first_host=$(grep -o '"host_vm_ip":"[^"]*"' "$hosts_file" | head -1 | cut -d'"' -f4)
+      first_user=$(grep -o '"username":"[^"]*"' "$hosts_file" | head -1 | cut -d'"' -f4)
+      first_pass=$(grep -o '"password":"[^"]*"' "$hosts_file" | head -1 | cut -d'"' -f4)
+    fi
+
+    echo "DB_HOST=$first_host" | tee -a db.env
+    echo "DB_USER=$first_user" | tee -a db.env
+
+    # Remove existing entry if present
+    sed -i '/^DB_PASSWORD=/d' db.env 2>/dev/null
+    # Write password silently
+    printf 'DB_PASSWORD=%s\n' "$first_pass" >> db.env
+
+    echo -e "${GREEN}✓ Primary host set in db.env: $first_host${NC}"
+  fi
+
+  echo ""
+  echo -e "${GREEN}========================================${NC}"
+  echo -e "${GREEN}  Configuration Summary${NC}"
+  echo -e "${GREEN}========================================${NC}"
+  echo -e "Agent VM IP: $agent_vm_ip"
+  echo -e "Total Database Hosts: $host_count"
+  echo -e "Hosts file: $hosts_file"
+  echo -e "Environment file: $env_file"
+  echo ""
 
 
   # Download the service file
