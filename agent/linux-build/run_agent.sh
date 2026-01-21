@@ -156,34 +156,76 @@ print_error() {
 
 # Update package list
 print_status "Updating package list..."
-apt-get update -y || print_error "Failed to update package list."
+# apt-get update -y || print_error "Failed to update package list."
 
 print_status "Installing dependencies..."
 
-apt-get update -y && \
-apt-get install -y \
-    build-essential \
-    automake \
-    cmake \
-    make \
-    git \
-    pkg-config \
-    bzip2 \
-    patch \
-    libtool \
-    uuid-dev \
-    zlib1g-dev \
-    libevent-dev \
-    libjemalloc-dev \
-    libssl-dev \
-    libgnutls28-dev \
-    libicu-dev \
-    nlohmann-json3-dev \
-    default-libmysqlclient-dev \
-    mysql-client-core-8.0 \
-    postgresql \
-    postgresql-contrib \
-    || print_error "Failed to install dependencies."
+# apt-get update -y && \
+# apt-get install -y \
+#     build-essential \
+#     automake \
+#     cmake \
+#     make \
+#     git \
+#     pkg-config \
+#     bzip2 \
+#     patch \
+#     libtool \
+#     uuid-dev \
+#     zlib1g-dev \
+#     libevent-dev \
+#     libjemalloc-dev \
+#     libssl-dev \
+#     libgnutls28-dev \
+#     libicu-dev \
+#     nlohmann-json3-dev \
+#     default-libmysqlclient-dev \
+#     mysql-client-core-8.0 \
+#     postgresql \
+#     postgresql-contrib \
+#     || print_error "Failed to install dependencies."
+
+PACKAGES=(
+  build-essential
+  automake
+  cmake
+  make
+  git
+  pkg-config
+  bzip2
+  patch
+  libtool
+  uuid-dev
+  zlib1g-dev
+  libevent-dev
+  libjemalloc-dev
+  libssl-dev
+  libgnutls28-dev
+  libicu-dev
+  nlohmann-json3-dev
+  default-libmysqlclient-dev
+  mysql-client-core-8.0
+  postgresql
+  postgresql-contrib
+)
+
+MISSING_PKGS=()
+
+for pkg in "${PACKAGES[@]}"; do
+    if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+        MISSING_PKGS+=("$pkg")
+    fi
+done
+
+if [ "${#MISSING_PKGS[@]}" -eq 0 ]; then
+    echo "All dependencies are already installed"
+else
+    echo "Installing missing packages: ${MISSING_PKGS[*]}"
+    apt-get update -y && \
+    apt-get install -y "${MISSING_PKGS[@]}" \
+        || print_error "Failed to install dependencies."
+fi
+
 # check if proxysql service is already running
 if agent_status proxysql; then
     print_status "ProxySQL service is already running"
@@ -266,6 +308,9 @@ fi
 if [ ! -f "$env_file" ]; then
     print_error "Environment file not found: $env_file"
 fi
+
+# Remove Windows-style line endings if present
+sed -i 's/\r$//' "$env_file"
 
 # Export variables from env file
 set -a
