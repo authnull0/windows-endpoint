@@ -249,7 +249,6 @@ agent_status() {
 
 # Remove existing entry if present (optional but recommended)
 #sed -i '/^DB_PASSWORD=/d' db.env 2>/dev/null
-add_database
 # # Write password silently
 # printf 'DB_PASSWORD=%s\n' "$password" >> db.env
 
@@ -275,20 +274,28 @@ else
         echo "Symlink already exists"
     fi
 fi
-  
+echo -e "${GREEN}=> Service file setup completed.${NC}${NORMAL}"
+echo " Do you want to input database configurations now? (Y/y to proceed, N/n to skip):"
+read -r db_input
+if [[ "$db_input" == "Y" || "$db_input" == "y" ]]; then
+    add_database
+else
+    echo "Skipping database configuration input."
+fi
+
 # Enable systemd service for the agent
 echo -e "${GREEN}=> Enabling and starting the agent service...${NC}${NORMAL}"
 sudo systemctl daemon-reload
 sudo systemctl start db-agent
 sudo systemctl enable db-agent
 
-# Verify if the agent service is running
-if agent_status "$service_binary"; then
-    echo -e "${GREEN}=> Agent service is running successfully.${NC}${NORMAL}"
-else
-    echo -e "${RED}=> ERROR: Agent service failed to start.${NC}${NORMAL}"
-    exit 1
-fi
+# # Verify if the agent service is running
+# if agent_status "$service_binary"; then
+#     echo -e "${GREEN}=> Agent service is running successfully.${NC}${NORMAL}"
+# else
+#     echo -e "${RED}=> ERROR: Agent service failed to start.${NC}${NORMAL}"
+#     exit 1
+# fi
 cd -
 
 # BEGIN PROXYSQL INSTALLATION
@@ -510,15 +517,15 @@ else
     print_error "ERROR: ProxySQL service failed to start."
     exit 1
 fi
-# Restart db agent once again to ensure connectivity to proxysql
-print_status "Restarting db-agent service to ensure connectivity to ProxySQL..."
-systemctl restart db-agent || print_error "Failed to restart db-agent service."
-if agent_status "$service_binary"; then
-    print_status "db-agent service is running successfully."
-else
-    print_error "ERROR: db-agent service failed to start after ProxySQL installation."
-    exit 1
-fi
+# # Restart db agent once again to ensure connectivity to proxysql
+# print_status "Restarting db-agent service to ensure connectivity to ProxySQL..."
+# systemctl restart db-agent || print_error "Failed to restart db-agent service."
+# if agent_status "$service_binary"; then
+#     print_status "db-agent service is running successfully."
+# else
+#     print_error "ERROR: db-agent service failed to start after ProxySQL installation."
+#     exit 1
+# fi
 elif 
 [[ "$user_input" == "N" || "$user_input" == "n" ]]; then
     echo "Skipping ProxySQL installation as per user request."
@@ -537,6 +544,13 @@ elif [ "$ACTION" = "add" ]; then
     cd "$dir" 
     fi
     add_database
+    if agent_status "$service_binary"; then
+        echo -e "${GREEN}=> Restarting agent service to apply new configuration...${NC}${NORMAL}"
+        sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
+        echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+    else
+        echo -e "${RED}=> ERROR: Agent service is not running. Please start the service manually.${NC}${NORMAL}"
+    fi
 elif [ "$ACTION" = "delete" ]; then
     if [ ! -d "$dir" ]; then
     echo "Directory does not exist. Exiting"
@@ -546,6 +560,13 @@ elif [ "$ACTION" = "delete" ]; then
     cd "$dir" 
     fi 
     delete_database
+    if agent_status "$service_binary"; then
+        echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
+        sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
+        echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+    else
+        echo -e "${RED}=> ERROR: Agent service is not running. Please start the service manually.${NC}${NORMAL}"
+    fi
 elif [ "$ACTION" = "modify" ]; then
     if [ ! -d "$dir" ]; then
     echo "Directory does not exist. Exiting"
@@ -555,4 +576,11 @@ elif [ "$ACTION" = "modify" ]; then
     cd "$dir"  
     fi
     modify_database
+    if agent_status "$service_binary"; then
+        echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
+        sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
+        echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+    else
+        echo -e "${RED}=> ERROR: Agent service is not running. Please start the service manually.${NC}${NORMAL}"
+    fi
 fi
