@@ -26,7 +26,6 @@ service_src="$dir/$service_name"
 service_dst="/etc/systemd/system/$service_name"
 env_file="$dir/db.env"
 DATA_SOURCE_FILE="data-source.yaml"
-ENCRYPTION_KEY="authnull-secret-key"
 
 # Function to print status
 print_status() {
@@ -38,7 +37,6 @@ print_error() {
     echo -e "${RED}[-] ERROR: $1${NC}"
     exit 1
 }
-
 encrypt_password() {
 if [ ! -f "$env_file" ] ; then
     echo "Environment file not found: $env_file"
