@@ -2,6 +2,13 @@
 
 # Exit on any error
 set -e
+ACTION="$1" # add or delete or modify
+
+if [ -z "$ACTION" ]; then
+    echo "Usage: $0 {install|add|delete|modify}"
+    exit 1
+fi
+
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -18,6 +25,150 @@ service_name="db-agent.service"
 service_src="$dir/$service_name"
 service_dst="/etc/systemd/system/$service_name"
 env_file="$dir/db.env"
+DATA_SOURCE_FILE="data-source.yaml"
+ENCRYPTION_KEY="authnull-secret-key"
+
+# Function to print status
+print_status() {
+    echo -e "${GREEN}[+] $1${NC}"
+}
+
+# Function to print error and exit
+print_error() {
+    echo -e "${RED}[-] ERROR: $1${NC}"
+    exit 1
+}
+
+encrypt_password() {
+if [ ! -f "$env_file" ] ; then
+    echo "Environment file not found: $env_file"
+    exit 1
+fi
+set -a
+source "$env_file"
+set +a
+if [ -z "$KEY" ] ; then
+    echo "KEY not set in $env_file"
+    exit 1
+fi
+
+  echo -n "$1" | openssl enc -aes-256-cbc -a -salt \
+    -pbkdf2 -iter 100000 \
+    -pass pass:"$KEY"
+}
+
+add_database() {
+echo -e "${GREEN}=> Adding new database configuration...${NC}${NORMAL}"
+DATA_SOURCE_FILE="data-source.yaml"
+
+# Ensure YAML file exists
+if [ ! -f "$DATA_SOURCE_FILE" ]; then
+  echo "Creating data source file: $DATA_SOURCE_FILE"
+  echo "databases:" > "$DATA_SOURCE_FILE"
+fi
+
+# DB type
+db_type="postgres"
+db_type="$(echo "$db_type" | xargs)"
+
+# Host
+read -rp "Enter host: " host
+host="$(echo "$host" | xargs)"
+
+# Port (default by type)
+db_port="5432"
+db_port="$(echo "$db_port" | xargs)"
+
+# Username
+read -rp "Enter username: " username
+username="$(echo "$username" | xargs)"
+
+# Password (hidden)
+read -rsp "Enter password: " password
+echo
+read -rsp "Confirm password: " confirm_password
+echo
+
+if [ "$password" != "$confirm_password" ]; then
+  echo "Passwords do not match"
+  exit 1
+fi
+
+encrypted_password=$(encrypt_password "$password")
+
+# Append to YAML
+cat <<EOF >> "$DATA_SOURCE_FILE"
+  - host: $host
+    type: $db_type
+    port: $db_port
+    username: $username
+    password: ENC($encrypted_password)
+EOF
+echo "Database '$host' added successfully"
+}
+delete_database() {
+echo -e "${GREEN}=> Deleting database configuration...${NC}${NORMAL}"
+# Host
+read -rp "Enter host: " host
+host="$(echo "$host" | xargs)"
+# Verify entry exists
+grep -n "^[[:space:]]*- host: $host$" "$DATA_SOURCE_FILE" || {
+  echo "Database not found"
+  exit 1
+}
+host="$(echo "$host" | xargs)"
+# Remove entry from YAML
+sed -i.bak "/host: $host/,+4d" "$DATA_SOURCE_FILE"
+echo "Database with host '$host' deleted successfully"
+}
+
+modify_database() {
+echo -e "${GREEN}=> Modifying database configuration...${NC}${NORMAL}"
+# Host
+read -rp "Enter host of the database to modify: " host
+host="$(echo "$host" | xargs)"
+# Verify entry exists
+grep -n "^[[:space:]]*- host: $host$" "$DATA_SOURCE_FILE" || {
+  echo "Database not found"
+  exit 1
+}
+
+# New Host
+read -rp "Enter new host: " new_host
+new_host="$(echo "$new_host" | xargs)"
+port="5432"
+db_type="postgres"
+# New Username
+read -rp "Enter new username: " new_username        
+new_username="$(echo "$new_username" | xargs)"
+# New Password (hidden)
+read -rsp "Enter new password: " new_password
+echo
+read -rsp "Confirm new password: " confirm_password
+echo
+if [ "$new_password" != "$confirm_password" ]; then
+  echo "Passwords do not match"
+  exit 1
+fi
+encrypted_password=$(encrypt_password "$new_password")
+# Modify entry in YAML
+sed -i.bak "
+/^[[:space:]]*- host: $host$/{
+  s|^\([[:space:]]*\)- host: .*|\1- host: $new_host|
+  n; s|^\([[:space:]]*\)type: .*|\1type: $db_type|
+  n; s|^\([[:space:]]*\)port: .*|\1port: $port|
+  n; s|^\([[:space:]]*\)username: .*|\1username: $new_username|
+  n; s|^\([[:space:]]*\)password: .*|\1password: ENC($encrypted_password)|
+}
+" "$DATA_SOURCE_FILE"
+
+
+echo "Database with host '$host' modified successfully"
+}
+
+
+if [ "$ACTION" = "install" ]; then
+  echo -e "${GREEN}=> Starting Database Agent Installation...${NC}${NORMAL}"
 
 # Check if running as root or with sudo
 if [ "$EUID" -ne 0 ]; then
@@ -82,30 +233,30 @@ agent_status() {
   # sudo echo -n "$db_env_content" > db.env
   echo "$db_env_content" | tee -a db.env
 
-  # Prompt for host
-  echo -en "${BOLD}${YELLOW}=> Enter host${BLUE}: ${NORMAL}${NC}"
-  read -r host
-  host="$(echo "$host" | xargs)"
-  echo "DB_HOST=$host" | tee -a db.env
+#   # Prompt for host
+#   echo -en "${BOLD}${YELLOW}=> Enter host${BLUE}: ${NORMAL}${NC}"
+#   read -r host
+#   host="$(echo "$host" | xargs)"
+#   echo "DB_HOST=$host" | tee -a db.env
 
-  # Prompt for username
-  echo -en "${BOLD}${YELLOW}=> Enter username${BLUE}: ${NORMAL}${NC}"
-  read -r username
-  username="$(echo "$username" | xargs)"
-  echo "DB_USER=$username" | tee -a db.env
-  # Prompt for password (hidden input)
-echo -en "${BOLD}${YELLOW}=> Enter password${BLUE}: ${NORMAL}${NC}"
-read -s password
-echo
+#   # Prompt for username
+#   echo -en "${BOLD}${YELLOW}=> Enter username${BLUE}: ${NORMAL}${NC}"
+#   read -r username
+#   username="$(echo "$username" | xargs)"
+#   echo "DB_USER=$username" | tee -a db.env
+#   # Prompt for password (hidden input)
+# echo -en "${BOLD}${YELLOW}=> Enter password${BLUE}: ${NORMAL}${NC}"
+# read -s password
+# echo
 
 # Remove existing entry if present (optional but recommended)
-sed -i '/^DB_PASSWORD=/d' db.env 2>/dev/null
+#sed -i '/^DB_PASSWORD=/d' db.env 2>/dev/null
+add_database
+# # Write password silently
+# printf 'DB_PASSWORD=%s\n' "$password" >> db.env
 
-# Write password silently
-printf 'DB_PASSWORD=%s\n' "$password" >> db.env
 
-
-  # Download the service file
+# Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
   wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/postgres-db-agent/agent/linux-build/db-agent.service
   
@@ -143,19 +294,12 @@ fi
 cd -
 
 # BEGIN PROXYSQL INSTALLATION
-# Function to print status
-print_status() {
-    echo -e "${GREEN}[+] $1${NC}"
-}
-
-# Function to print error and exit
-print_error() {
-    echo -e "${RED}[-] ERROR: $1${NC}"
-    exit 1
-}
-
+echo -e "${GREEN}=> Starting ProxySQL Installation...${NC}${NORMAL}"
+echo "Press Enter( type Y/y) to proceed with ProxySQL installation or N/n to skip if the installation is already done:"
+read -r user_input
+if [[ "$user_input" == "Y" || "$user_input" == "y" || -z "$user_input" ]]; then
 # Update package list
-print_status "Updating package list..."
+# print_status "Updating package list..."
 # apt-get update -y || print_error "Failed to update package list."
 
 print_status "Installing dependencies..."
@@ -377,5 +521,40 @@ else
     print_error "ERROR: db-agent service failed to start after ProxySQL installation."
     exit 1
 fi
-print_status "All services are up and running."
+elif 
+[[ "$user_input" == "N" || "$user_input" == "n" ]]; then
+    echo "Skipping ProxySQL installation as per user request."
+else
+    echo "Invalid input. Skipping ProxySQL installation."
+fi 
+# print_status "All services are up and running."
 print_status "Database Agent Installation and Setup completed successfully."
+
+elif [ "$ACTION" = "add" ]; then
+    if [ ! -d "$dir" ]; then
+    echo "Directory does not exist. Exiting"
+    exit 1
+  else
+    echo "Directory exists: $dir"
+    cd "$dir" 
+    fi
+    add_database
+elif [ "$ACTION" = "delete" ]; then
+    if [ ! -d "$dir" ]; then
+    echo "Directory does not exist. Exiting"
+    exit 1
+  else
+    echo "Directory exists: $dir"
+    cd "$dir" 
+    fi 
+    delete_database
+elif [ "$ACTION" = "modify" ]; then
+    if [ ! -d "$dir" ]; then
+    echo "Directory does not exist. Exiting"
+    exit 1
+  else
+    echo "Directory exists: $dir"
+    cd "$dir"  
+    fi
+    modify_database
+fi
