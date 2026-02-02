@@ -37,6 +37,20 @@ print_error() {
     echo -e "${RED}[-] ERROR: $1${NC}"
     exit 1
 }
+
+#Check Agent running Status 
+agent_status() {
+    local svc="$1"
+    echo "Checking if $svc is already running"
+    if pgrep -f "$svc" >/dev/null; then
+        echo "Process $svc is running."
+        return 0  # success means running
+    else 
+        echo "Process $svc is not running"
+        return 1 # failure means not running 
+    fi
+}
+
 encrypt_password() {
 if [ ! -f "$env_file" ] ; then
     echo "Environment file not found: $env_file"
@@ -173,20 +187,8 @@ if [ "$EUID" -ne 0 ]; then
     echo "This script must be run as root or with sudo."
     exit 1
 fi
-#Check Agent running Status 
-agent_status() {
-    local svc="$1"
-    echo "Checking if $svc is already running"
-    if pgrep -f "$svc" >/dev/null; then
-        echo "Process $svc is running."
-        return 0  # success means running
-    else 
-        echo "Process $svc is not running"
-        return 1 # failure means not running 
-    fi
-}
 
-  # Stop the existing agent if running
+# Stop the existing agent if running
   echo -e "${YELLOW}=> Checking for existing agent service...${NC}${NORMAL}"
   if agent_status "$service_binary"; then
     echo -e "${YELLOW}=> Stopping existing agent service...${NC}${NORMAL}"
@@ -252,6 +254,8 @@ agent_status() {
 # # Write password silently
 # printf 'DB_PASSWORD=%s\n' "$password" >> db.env
 
+# Remove Windows-style line endings if present
+sed -i 's/\r$//' "$env_file"
 
 # Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
@@ -544,13 +548,10 @@ elif [ "$ACTION" = "add" ]; then
     cd "$dir" 
     fi
     add_database
-    if agent_status "$service_binary"; then
-        echo -e "${GREEN}=> Restarting agent service to apply new configuration...${NC}${NORMAL}"
-        sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
-        echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
-    else
-        echo -e "${RED}=> ERROR: Agent service is not running. Please start the service manually.${NC}${NORMAL}"
-    fi
+    # Restart agent to apply changes
+    echo -e "${GREEN}=> Restarting agent service to apply new configuration...${NC}${NORMAL}"
+    sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
+    echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
 elif [ "$ACTION" = "delete" ]; then
     if [ ! -d "$dir" ]; then
     echo "Directory does not exist. Exiting"
@@ -560,11 +561,11 @@ elif [ "$ACTION" = "delete" ]; then
     cd "$dir" 
     fi 
     delete_database
-    if agent_status "$service_binary"; then
-        echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
-        sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
-        echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
-    else
+    # Restart agent to apply changes
+    echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
+    sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
+    echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+else
         echo -e "${RED}=> ERROR: Agent service is not running. Please start the service manually.${NC}${NORMAL}"
     fi
 elif [ "$ACTION" = "modify" ]; then
@@ -576,11 +577,9 @@ elif [ "$ACTION" = "modify" ]; then
     cd "$dir"  
     fi
     modify_database
-    if agent_status "$service_binary"; then
-        echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
-        sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
-        echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
-    else
-        echo -e "${RED}=> ERROR: Agent service is not running. Please start the service manually.${NC}${NORMAL}"
-    fi
+    # Restart agent to apply changes
+    echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${
+    sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
+    echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+    
 fi
