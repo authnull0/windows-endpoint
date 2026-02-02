@@ -552,6 +552,7 @@ elif [ "$ACTION" = "add" ]; then
     echo -e "${GREEN}=> Restarting agent service to apply new configuration...${NC}${NORMAL}"
     sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
     echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+
 elif [ "$ACTION" = "delete" ]; then
     if [ ! -d "$dir" ]; then
     echo "Directory does not exist. Exiting"
@@ -565,9 +566,7 @@ elif [ "$ACTION" = "delete" ]; then
     echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
     sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
     echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
-else
-        echo -e "${RED}=> ERROR: Agent service is not running. Please start the service manually.${NC}${NORMAL}"
-    fi
+
 elif [ "$ACTION" = "modify" ]; then
     if [ ! -d "$dir" ]; then
     echo "Directory does not exist. Exiting"
@@ -578,7 +577,7 @@ elif [ "$ACTION" = "modify" ]; then
     fi
     modify_database
     # Restart agent to apply changes
-    echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${
+    echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
     sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
     echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
     
