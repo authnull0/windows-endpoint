@@ -117,6 +117,8 @@ cat <<EOF >> "$DATA_SOURCE_FILE"
     password: ENC($encrypted_password)
 EOF
 echo "Database '$host' added successfully"
+# Remove Windows-style line endings if present
+sed -i 's/\r$//' "$DATA_SOURCE_FILE"
 }
 delete_database() {
 echo -e "${GREEN}=> Deleting database configuration...${NC}${NORMAL}"
