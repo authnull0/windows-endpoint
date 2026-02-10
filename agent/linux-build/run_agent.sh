@@ -216,17 +216,6 @@ fi
   echo -e "${GREEN}=> Done\n${NC}${NORMAL}"
   # Prompt user to input content for db.env
   echo -e "${GREEN}Please enter the content for the db.env file. End with an empty line or Ctrl+D:${NC}${NORMAL}"
-  echo -e "${YELLOW}Required fields: ORG_ID, TENANT_ID, DB_TYPE, DB_PORT, TIME_INTERVAL, API, KEY, MACHINE_KEY${NC}${NORMAL}"
-  echo -e "${YELLOW}Example:${NC}"
-  echo -e "ORG_ID=1"
-  echo -e "TENANT_ID=1"
-  echo -e "DB_TYPE=postgres"
-  echo -e "DB_PORT=5432"
-  echo -e "TIME_INTERVAL=1"
-  echo -e "API=https://prod.api.authnull.com"
-  echo -e "KEY=your-key"
-  echo -e "MACHINE_KEY=AGENT01"
-  echo ""
 
   # Initialize an empty string to store the content
   db_env_content=""
@@ -593,3 +582,4 @@ elif [ "$ACTION" = "modify" ]; then
     echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
     
 fi
+
