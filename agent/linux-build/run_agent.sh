@@ -2,6 +2,13 @@
 
 # Exit on any error
 set -e
+ACTION="$1" # add or delete or modify
+
+if [ -z "$ACTION" ]; then
+    echo "Usage: $0 {install|add|delete|modify}"
+    exit 1
+fi
+
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -18,12 +25,19 @@ service_name="db-agent.service"
 service_src="$dir/$service_name"
 service_dst="/etc/systemd/system/$service_name"
 env_file="$dir/db.env"
+DATA_SOURCE_FILE="data-source.yaml"
 
-# Check if running as root or with sudo
-if [ "$EUID" -ne 0 ]; then
-    echo "This script must be run as root or with sudo."
+# Function to print status
+print_status() {
+    echo -e "${GREEN}[+] $1${NC}"
+}
+
+# Function to print error and exit
+print_error() {
+    echo -e "${RED}[-] ERROR: $1${NC}"
     exit 1
-fi
+}
+
 #Check Agent running Status 
 agent_status() {
     local svc="$1"
@@ -37,7 +51,144 @@ agent_status() {
     fi
 }
 
-  # Stop the existing agent if running
+encrypt_password() {
+if [ ! -f "$env_file" ] ; then
+    echo "Environment file not found: $env_file"
+    exit 1
+fi
+set -a
+source "$env_file"
+set +a
+if [ -z "$KEY" ] ; then
+    echo "KEY not set in $env_file"
+    exit 1
+fi
+
+  echo -n "$1" | openssl enc -aes-256-cbc -a -salt \
+    -pbkdf2 -iter 100000 \
+    -pass pass:"$KEY"
+}
+
+add_database() {
+echo -e "${GREEN}=> Adding new database configuration...${NC}${NORMAL}"
+DATA_SOURCE_FILE="data-source.yaml"
+
+# Ensure YAML file exists
+if [ ! -f "$DATA_SOURCE_FILE" ]; then
+  echo "Creating data source file: $DATA_SOURCE_FILE"
+  echo "databases:" > "$DATA_SOURCE_FILE"
+fi
+
+# DB type
+db_type="postgres"
+db_type="$(echo "$db_type" | xargs)"
+
+# Host
+read -rp "Enter host: " host
+host="$(echo "$host" | xargs)"
+
+# Port (default by type)
+db_port="5432"
+db_port="$(echo "$db_port" | xargs)"
+
+# Username
+read -rp "Enter username: " username
+username="$(echo "$username" | xargs)"
+
+# Password (hidden)
+read -rsp "Enter password: " password
+echo
+read -rsp "Confirm password: " confirm_password
+echo
+
+if [ "$password" != "$confirm_password" ]; then
+  echo "Passwords do not match"
+  exit 1
+fi
+
+encrypted_password=$(encrypt_password "$password")
+
+# Append to YAML
+cat <<EOF >> "$DATA_SOURCE_FILE"
+  - host: $host
+    type: $db_type
+    port: $db_port
+    username: $username
+    password: ENC($encrypted_password)
+EOF
+echo "Database '$host' added successfully"
+}
+delete_database() {
+echo -e "${GREEN}=> Deleting database configuration...${NC}${NORMAL}"
+# Host
+read -rp "Enter host: " host
+host="$(echo "$host" | xargs)"
+# Verify entry exists
+grep -n "^[[:space:]]*- host: $host$" "$DATA_SOURCE_FILE" || {
+  echo "Database not found"
+  exit 1
+}
+host="$(echo "$host" | xargs)"
+# Remove entry from YAML
+sed -i.bak "/host: $host/,+4d" "$DATA_SOURCE_FILE"
+echo "Database with host '$host' deleted successfully"
+}
+
+modify_database() {
+echo -e "${GREEN}=> Modifying database configuration...${NC}${NORMAL}"
+# Host
+read -rp "Enter host of the database to modify: " host
+host="$(echo "$host" | xargs)"
+# Verify entry exists
+grep -n "^[[:space:]]*- host: $host$" "$DATA_SOURCE_FILE" || {
+  echo "Database not found"
+  exit 1
+}
+
+# New Host
+read -rp "Enter new host: " new_host
+new_host="$(echo "$new_host" | xargs)"
+port="5432"
+db_type="postgres"
+# New Username
+read -rp "Enter new username: " new_username        
+new_username="$(echo "$new_username" | xargs)"
+# New Password (hidden)
+read -rsp "Enter new password: " new_password
+echo
+read -rsp "Confirm new password: " confirm_password
+echo
+if [ "$new_password" != "$confirm_password" ]; then
+  echo "Passwords do not match"
+  exit 1
+fi
+encrypted_password=$(encrypt_password "$new_password")
+# Modify entry in YAML
+sed -i.bak "
+/^[[:space:]]*- host: $host$/{
+  s|^\([[:space:]]*\)- host: .*|\1- host: $new_host|
+  n; s|^\([[:space:]]*\)type: .*|\1type: $db_type|
+  n; s|^\([[:space:]]*\)port: .*|\1port: $port|
+  n; s|^\([[:space:]]*\)username: .*|\1username: $new_username|
+  n; s|^\([[:space:]]*\)password: .*|\1password: ENC($encrypted_password)|
+}
+" "$DATA_SOURCE_FILE"
+
+
+echo "Database with host '$host' modified successfully"
+}
+
+
+if [ "$ACTION" = "install" ]; then
+  echo -e "${GREEN}=> Starting Database Agent Installation...${NC}${NORMAL}"
+
+# Check if running as root or with sudo
+if [ "$EUID" -ne 0 ]; then
+    echo "This script must be run as root or with sudo."
+    exit 1
+fi
+
+# Stop the existing agent if running
   echo -e "${YELLOW}=> Checking for existing agent service...${NC}${NORMAL}"
   if agent_status "$service_binary"; then
     echo -e "${YELLOW}=> Stopping existing agent service...${NC}${NORMAL}"
@@ -65,17 +216,6 @@ agent_status() {
   echo -e "${GREEN}=> Done\n${NC}${NORMAL}"
   # Prompt user to input content for db.env
   echo -e "${GREEN}Please enter the content for the db.env file. End with an empty line or Ctrl+D:${NC}${NORMAL}"
-  echo -e "${YELLOW}Required fields: ORG_ID, TENANT_ID, DB_TYPE, DB_PORT, TIME_INTERVAL, API, KEY, MACHINE_KEY${NC}${NORMAL}"
-  echo -e "${YELLOW}Example:${NC}"
-  echo -e "ORG_ID=1"
-  echo -e "TENANT_ID=1"
-  echo -e "DB_TYPE=postgres"
-  echo -e "DB_PORT=5432"
-  echo -e "TIME_INTERVAL=1"
-  echo -e "API=https://prod.api.authnull.com"
-  echo -e "KEY=your-key"
-  echo -e "MACHINE_KEY=AGENT01"
-  echo ""
 
   # Initialize an empty string to store the content
   db_env_content=""
@@ -93,128 +233,31 @@ agent_status() {
   # sudo echo -n "$db_env_content" > db.env
   echo "$db_env_content" | tee -a db.env
 
-  # Get this agent VM's IP address for multi-host mode
-  echo -e "${GREEN}=> Detecting Agent VM IP address...${NC}${NORMAL}"
-  agent_vm_ip=$(hostname -I | awk '{print $1}')
-  echo -e "${YELLOW}Detected IP: $agent_vm_ip${NC}"
-  echo -en "${BOLD}${YELLOW}=> Confirm Agent VM IP (press Enter to use $agent_vm_ip or type new IP)${BLUE}: ${NORMAL}${NC}"
-  read -r custom_ip
-  if [ -n "$custom_ip" ]; then
-    agent_vm_ip="$(echo "$custom_ip" | xargs)"
-  fi
-  echo "AGENT_VM_IP=$agent_vm_ip" | tee -a db.env
+#   # Prompt for host
+#   echo -en "${BOLD}${YELLOW}=> Enter host${BLUE}: ${NORMAL}${NC}"
+#   read -r host
+#   host="$(echo "$host" | xargs)"
+#   echo "DB_HOST=$host" | tee -a db.env
 
-  # Multi-host configuration
-  echo ""
-  echo -e "${GREEN}========================================${NC}"
-  echo -e "${GREEN}  MULTI-HOST DATABASE CONFIGURATION${NC}"
-  echo -e "${GREEN}========================================${NC}"
-  echo -e "${YELLOW}This agent can manage multiple database hosts.${NC}"
-  echo -e "${YELLOW}You will be prompted to add database hosts one by one.${NC}"
-  echo ""
+#   # Prompt for username
+#   echo -en "${BOLD}${YELLOW}=> Enter username${BLUE}: ${NORMAL}${NC}"
+#   read -r username
+#   username="$(echo "$username" | xargs)"
+#   echo "DB_USER=$username" | tee -a db.env
+#   # Prompt for password (hidden input)
+# echo -en "${BOLD}${YELLOW}=> Enter password${BLUE}: ${NORMAL}${NC}"
+# read -s password
+# echo
 
-  # Initialize hosts JSON file
-  hosts_file="$dir/db_hosts.json"
-  echo '{"hosts":[]}' > "$hosts_file"
+# Remove existing entry if present (optional but recommended)
+#sed -i '/^DB_PASSWORD=/d' db.env 2>/dev/null
+# # Write password silently
+# printf 'DB_PASSWORD=%s\n' "$password" >> db.env
 
-  host_count=0
-  add_more="y"
+# Remove Windows-style line endings if present
+sed -i 's/\r$//' "$env_file"
 
-  while [[ "$add_more" =~ ^[Yy]$ ]]; do
-    host_count=$((host_count + 1))
-    echo ""
-    echo -e "${GREEN}--- Database Host #$host_count ---${NC}"
-
-    # Prompt for host VM IP
-    echo -en "${BOLD}${YELLOW}=> Enter Database Host VM IP${BLUE}: ${NORMAL}${NC}"
-    read -r host_vm_ip
-    host_vm_ip="$(echo "$host_vm_ip" | xargs)"
-
-    # Prompt for port (default 5432)
-    echo -en "${BOLD}${YELLOW}=> Enter Database Port (default: 5432)${BLUE}: ${NORMAL}${NC}"
-    read -r db_port
-    db_port="$(echo "$db_port" | xargs)"
-    if [ -z "$db_port" ]; then
-      db_port="5432"
-    fi
-
-    # Prompt for username
-    echo -en "${BOLD}${YELLOW}=> Enter Database Admin Username${BLUE}: ${NORMAL}${NC}"
-    read -r username
-    username="$(echo "$username" | xargs)"
-
-    # Prompt for password (hidden input)
-    echo -en "${BOLD}${YELLOW}=> Enter Database Admin Password${BLUE}: ${NORMAL}${NC}"
-    read -s password
-    echo
-
-    # Add host to JSON file using jq or manual JSON construction
-    if command -v jq &> /dev/null; then
-      # Use jq if available
-      jq --arg ip "$host_vm_ip" --arg port "$db_port" --arg user "$username" --arg pass "$password" \
-        '.hosts += [{"host_vm_ip": $ip, "port": $port, "username": $user, "password": $pass}]' \
-        "$hosts_file" > "${hosts_file}.tmp" && mv "${hosts_file}.tmp" "$hosts_file"
-    else
-      # Manual JSON construction if jq is not available
-      if [ $host_count -eq 1 ]; then
-        echo "{\"hosts\":[{\"host_vm_ip\":\"$host_vm_ip\",\"port\":\"$db_port\",\"username\":\"$username\",\"password\":\"$password\"}]}" > "$hosts_file"
-      else
-        # Append to existing hosts array
-        sed -i "s/\]}$/,{\"host_vm_ip\":\"$host_vm_ip\",\"port\":\"$db_port\",\"username\":\"$username\",\"password\":\"$password\"}]}/" "$hosts_file"
-      fi
-    fi
-
-    echo -e "${GREEN}✓ Host #$host_count added: $host_vm_ip:$db_port${NC}"
-
-    # Ask if user wants to add more hosts
-    echo ""
-    echo -en "${BOLD}${YELLOW}=> Add another database host? (y/n)${BLUE}: ${NORMAL}${NC}"
-    read -r add_more
-  done
-
-  echo ""
-  echo -e "${GREEN}Total hosts configured: $host_count${NC}"
-
-  # Set permissions on hosts file (contains passwords)
-  chmod 600 "$hosts_file"
-
-  # For backward compatibility, also set the first host as DB_HOST, DB_USER, DB_PASSWORD
-  # This allows the agent to work in single-host mode if needed
-  if [ $host_count -ge 1 ]; then
-    if command -v jq &> /dev/null; then
-      first_host=$(jq -r '.hosts[0].host_vm_ip' "$hosts_file")
-      first_user=$(jq -r '.hosts[0].username' "$hosts_file")
-      first_pass=$(jq -r '.hosts[0].password' "$hosts_file")
-    else
-      # Parse manually (basic extraction)
-      first_host=$(grep -o '"host_vm_ip":"[^"]*"' "$hosts_file" | head -1 | cut -d'"' -f4)
-      first_user=$(grep -o '"username":"[^"]*"' "$hosts_file" | head -1 | cut -d'"' -f4)
-      first_pass=$(grep -o '"password":"[^"]*"' "$hosts_file" | head -1 | cut -d'"' -f4)
-    fi
-
-    echo "DB_HOST=$first_host" | tee -a db.env
-    echo "DB_USER=$first_user" | tee -a db.env
-
-    # Remove existing entry if present
-    sed -i '/^DB_PASSWORD=/d' db.env 2>/dev/null
-    # Write password silently
-    printf 'DB_PASSWORD=%s\n' "$first_pass" >> db.env
-
-    echo -e "${GREEN}✓ Primary host set in db.env: $first_host${NC}"
-  fi
-
-  echo ""
-  echo -e "${GREEN}========================================${NC}"
-  echo -e "${GREEN}  Configuration Summary${NC}"
-  echo -e "${GREEN}========================================${NC}"
-  echo -e "Agent VM IP: $agent_vm_ip"
-  echo -e "Total Database Hosts: $host_count"
-  echo -e "Hosts file: $hosts_file"
-  echo -e "Environment file: $env_file"
-  echo ""
-
-
-  # Download the service file
+# Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
   wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/postgres-db-agent/agent/linux-build/db-agent.service
   
@@ -235,36 +278,37 @@ else
         echo "Symlink already exists"
     fi
 fi
-  
+echo -e "${GREEN}=> Service file setup completed.${NC}${NORMAL}"
+echo " Do you want to input database configurations now? (Y/y to proceed, N/n to skip):"
+read -r db_input
+if [[ "$db_input" == "Y" || "$db_input" == "y" ]]; then
+    add_database
+else
+    echo "Skipping database configuration input."
+fi
+
 # Enable systemd service for the agent
 echo -e "${GREEN}=> Enabling and starting the agent service...${NC}${NORMAL}"
 sudo systemctl daemon-reload
 sudo systemctl start db-agent
 sudo systemctl enable db-agent
 
-# Verify if the agent service is running
-if agent_status "$service_binary"; then
-    echo -e "${GREEN}=> Agent service is running successfully.${NC}${NORMAL}"
-else
-    echo -e "${RED}=> ERROR: Agent service failed to start.${NC}${NORMAL}"
-    exit 1
-fi
+# # Verify if the agent service is running
+# if agent_status "$service_binary"; then
+#     echo -e "${GREEN}=> Agent service is running successfully.${NC}${NORMAL}"
+# else
+#     echo -e "${RED}=> ERROR: Agent service failed to start.${NC}${NORMAL}"
+#     exit 1
+# fi
 cd -
 
 # BEGIN PROXYSQL INSTALLATION
-# Function to print status
-print_status() {
-    echo -e "${GREEN}[+] $1${NC}"
-}
-
-# Function to print error and exit
-print_error() {
-    echo -e "${RED}[-] ERROR: $1${NC}"
-    exit 1
-}
-
+echo -e "${GREEN}=> Starting ProxySQL Installation...${NC}${NORMAL}"
+echo "Press Enter( type Y/y) to proceed with ProxySQL installation or N/n to skip if the installation is already done:"
+read -r user_input
+if [[ "$user_input" == "Y" || "$user_input" == "y" || -z "$user_input" ]]; then
 # Update package list
-print_status "Updating package list..."
+# print_status "Updating package list..."
 # apt-get update -y || print_error "Failed to update package list."
 
 print_status "Installing dependencies..."
@@ -477,14 +521,65 @@ else
     print_error "ERROR: ProxySQL service failed to start."
     exit 1
 fi
-# Restart db agent once again to ensure connectivity to proxysql
-print_status "Restarting db-agent service to ensure connectivity to ProxySQL..."
-systemctl restart db-agent || print_error "Failed to restart db-agent service."
-if agent_status "$service_binary"; then
-    print_status "db-agent service is running successfully."
+# # Restart db agent once again to ensure connectivity to proxysql
+# print_status "Restarting db-agent service to ensure connectivity to ProxySQL..."
+# systemctl restart db-agent || print_error "Failed to restart db-agent service."
+# if agent_status "$service_binary"; then
+#     print_status "db-agent service is running successfully."
+# else
+#     print_error "ERROR: db-agent service failed to start after ProxySQL installation."
+#     exit 1
+# fi
+elif 
+[[ "$user_input" == "N" || "$user_input" == "n" ]]; then
+    echo "Skipping ProxySQL installation as per user request."
 else
-    print_error "ERROR: db-agent service failed to start after ProxySQL installation."
-    exit 1
-fi
-print_status "All services are up and running."
+    echo "Invalid input. Skipping ProxySQL installation."
+fi 
+# print_status "All services are up and running."
 print_status "Database Agent Installation and Setup completed successfully."
+
+elif [ "$ACTION" = "add" ]; then
+    if [ ! -d "$dir" ]; then
+    echo "Directory does not exist. Exiting"
+    exit 1
+  else
+    echo "Directory exists: $dir"
+    cd "$dir" 
+    fi
+    add_database
+    # Restart agent to apply changes
+    echo -e "${GREEN}=> Restarting agent service to apply new configuration...${NC}${NORMAL}"
+    sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
+    echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+
+elif [ "$ACTION" = "delete" ]; then
+    if [ ! -d "$dir" ]; then
+    echo "Directory does not exist. Exiting"
+    exit 1
+  else
+    echo "Directory exists: $dir"
+    cd "$dir" 
+    fi 
+    delete_database
+    # Restart agent to apply changes
+    echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
+    sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
+    echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+
+elif [ "$ACTION" = "modify" ]; then
+    if [ ! -d "$dir" ]; then
+    echo "Directory does not exist. Exiting"
+    exit 1
+  else
+    echo "Directory exists: $dir"
+    cd "$dir"  
+    fi
+    modify_database
+    # Restart agent to apply changes
+    echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
+    sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
+    echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+    
+fi
+
