@@ -51,7 +51,32 @@ agent_status() {
     fi
 }
 
+ensure_openssl() {
+    if command -v openssl >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo "OpenSSL not found. Installing..."
+
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "Error: OpenSSL not installed and script is not running as root."
+        exit 1
+    fi
+
+    apt-get update -y || {
+        echo "Failed to update package list"
+        exit 1
+    }
+
+    apt-get install -y openssl || {
+        echo "Failed to install OpenSSL"
+        exit 1
+    }
+}
+
 encrypt_password() {
+
+ensure_openssl
 if [ ! -f "$env_file" ] ; then
     echo "Environment file not found: $env_file"
     exit 1
@@ -523,15 +548,18 @@ else
     print_error "ERROR: ProxySQL service failed to start."
     exit 1
 fi
-# # Restart db agent once again to ensure connectivity to proxysql
-# print_status "Restarting db-agent service to ensure connectivity to ProxySQL..."
-# systemctl restart db-agent || print_error "Failed to restart db-agent service."
-# if agent_status "$service_binary"; then
-#     print_status "db-agent service is running successfully."
-# else
-#     print_error "ERROR: db-agent service failed to start after ProxySQL installation."
-#     exit 1
-# fi
+# Restart db agent once again if the agent is already running to ensure connectivity to proxysql
+print_status "Restarting db-agent service to ensure connectivity to ProxySQL..."
+if agent_status "$service_binary"; then
+print_status "db-agent service is running. Restarting to apply ProxySQL changes..."
+systemctl restart db-agent || print_error "Failed to restart db-agent service."
+if agent_status "$service_binary"; then
+    print_status "db-agent service is running successfully."
+else
+    print_error "ERROR: db-agent service failed to start after ProxySQL installation."
+    exit 1
+fi
+fi
 elif 
 [[ "$user_input" == "N" || "$user_input" == "n" ]]; then
     echo "Skipping ProxySQL installation as per user request."
