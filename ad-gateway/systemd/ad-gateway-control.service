@@ -1,0 +1,33 @@
+[Unit]
+Description=AuthNull AD Gateway Control Plane
+Documentation=https://docs.authnull.com/ad-gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=authnull
+Group=authnull
+ExecStart=/usr/local/bin/ad-gateway-control --config /etc/authnull/control.yml
+Restart=on-failure
+RestartSec=5s
+EnvironmentFile=-/etc/authnull/app.env
+
+# Sandboxing — the control plane does not bind privileged ports, so no
+# ambient capabilities needed.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/authnull /var/log/authnull
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

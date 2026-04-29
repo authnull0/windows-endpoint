@@ -1,0 +1,50 @@
+# AuthNull AD Gateway — Control Plane configuration.
+
+listen: ":8443"
+
+tls:
+  cert_file: /etc/authnull/certs/control.crt
+  key_file:  /etc/authnull/certs/control.key
+  client_ca: /etc/authnull/certs/ca.crt  # mTLS: validate proxies
+
+# MFA factor issuance delegates to the authsec do-authenticationV4 endpoint.
+# Leave base_url / base_url_env empty to use NoopBridge (local tests only).
+#
+# Production: leave all values blank here and set them in /etc/authnull/app.env.
+# The *_env fields tell the control plane which env var to read at startup.
+mfa_bridge:
+  base_url: ""              # or set via AUTHNULL_BASE_URL in app.env
+  base_url_env: AUTHNULL_BASE_URL
+  email_domain: ""          # or set via AUTHNULL_EMAIL_DOMAIN in app.env
+  email_domain_env: AUTHNULL_EMAIL_DOMAIN
+  org_id: 0                 # or set via AUTHNULL_ORG_ID in app.env
+  org_id_env: AUTHNULL_ORG_ID
+  tenant_id: 0              # or set via AUTHNULL_TENANT_ID in app.env
+  tenant_id_env: AUTHNULL_TENANT_ID
+  timeout_sec: 90
+
+postgres_dsn: "postgres://authnull:password@postgres:5432/adgateway?sslmode=require"
+
+log_level: info
+
+# Policy engine: the control plane ships with AlwaysMFA — every decide
+# returns mfa_required. A real PDP (authsec / external policy service)
+# will plug in via the decision.Engine interface when it lands.
+
+# AD admin (optional): privileged LDAP bind for the unlock-account action
+# exposed at POST /api/v1/diagnostics/unlock. Leave the entire block
+# COMMENTED OUT for default deployments — the customer requirement is
+# diagnostics ("trace the source of bad auths"), not unlock. Enabling
+# this means the gateway holds AD write privileges; only do that when
+# the customer has explicitly asked for inline unlock.
+#
+# When this block is absent or empty, the unlock endpoint returns 503
+# and the helpdesk dashboard hides the unlock button automatically.
+#
+# ad:
+#   ldap_url: "ldaps://10.4.0.17:636"
+#   bind_dn: "CN=AuthNullSvc,CN=Users,DC=testad,DC=com"
+#   bind_password_env: "AD_BIND_PW"          # read from env, never in yaml
+#   base_dn: "DC=testad,DC=com"
+#   insecure_skip_verify: false              # true only in lab
+#   timeout_sec: 5

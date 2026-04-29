@@ -1,0 +1,87 @@
+# AuthNull AD Gateway — Proxy Configuration
+# Deploy to: /etc/authnull/proxy.yml
+
+# --- Control plane ---
+control_plane_url: https://control.authnull.example:8443
+gateway_id: va01.authnull.lab
+tenant_id: "1"
+
+# --- Upstream AD ---
+realm: AUTHNULL.LAB
+upstream_kdc:
+  - dc01.authnull.lab:88
+  - dc02.authnull.lab:88
+upstream_ldap:
+  - dc01.authnull.lab:389
+  - dc02.authnull.lab:389
+# Single DC's 445/tcp endpoint for the SMB MITM (Path 3B). Leave blank
+# to disable SMB inspection and keep relying on the kernel ipset gate
+# (Path 3A) alone.
+upstream_smb: dc01.authnull.lab:445
+
+# --- Listen sockets (VIP) ---
+listen:
+  kdc_tcp: ":88"
+  kdc_udp: ":88"
+  ldap:   ":389"
+  ldaps:  ":636"
+  # SMB userspace MITM. When set, the proxy parses every SMB SESSION_SETUP
+  # and MFA-gates the bind. Leave empty to skip — only the ipset gate
+  # protects 445 in that case. NOTE: enabling this means iptables must
+  # NOT DNAT 445 to the upstream DC; the proxy listens on 445 directly
+  # and forwards approved binds itself.
+  smb:    ":445"
+  health: ":9813"
+  metrics: ":9814"
+
+# --- Timing ---
+# How long a single auth may be held while waiting for MFA approval
+mfa_timeout: 60s
+# Total hold across policy + MFA + JIT + buffer
+max_auth_hold: 300s
+
+# --- Behaviour ---
+# monitor = log decisions but never block
+# enforce = actually allow/deny based on control-plane verdict
+mode: monitor
+
+# When the control plane is unreachable:
+# allow = fail open (availability-first; recommended for DCs)
+# deny  = fail closed (security-first)
+fallback_action: allow
+
+# --- Circuit breaker against control plane ---
+cb_threshold: 5
+cb_timeout: 30s
+
+# --- MFA session window ---
+# After a user approves an MFA push, subsequent Kerberos/LDAP requests from the
+# same (principal, client_ip) auto-allow for this long without re-prompting.
+# Windows logon fires 3-5 serial Kerberos ops per session — without this, each
+# would re-prompt the user, making the UX unusable. Default 5 minutes.
+# Set to 0 to disable (every request re-prompts).
+mfa_session_ttl: 5m
+
+# --- Uplink to AuthNull cloud (lockout dashboard data path) ---
+# Every audit event the gateway captures gets shipped to AuthNull's
+# ad-service, which powers the helpdesk lockout-diagnostics view in the
+# AuthNull dashboard. Leave url/url_env empty to disable uplink.
+#
+# Production: leave all values blank here and set them in /etc/authnull/app.env.
+uplink:
+  url: ""                                    # or set via AUTHNULL_UPLINK_URL in app.env
+  url_env: AUTHNULL_UPLINK_URL
+  org_id: 0                                  # or set via AUTHNULL_ORG_ID in app.env
+  org_id_env: AUTHNULL_ORG_ID
+  flush_interval_sec: 5
+  batch_size: 200
+  ring_capacity: 4096
+  http_timeout_sec: 10
+
+# --- mTLS to control plane / LDAPS server cert ---
+tls:
+  client_cert: /etc/authnull/certs/client.crt
+  client_key:  /etc/authnull/certs/client.key
+  ca_cert:     /etc/authnull/certs/ca.crt
+  ldaps_cert:  /etc/authnull/certs/ldaps.crt
+  ldaps_key:   /etc/authnull/certs/ldaps.key

@@ -1,0 +1,45 @@
+[Unit]
+Description=AuthNull AD Gateway Proxy
+Documentation=https://docs.authnull.com/ad-gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=authnull
+Group=authnull
+ExecStart=/usr/local/bin/ad-gateway-proxy --config /etc/authnull/proxy.yml
+Restart=on-failure
+RestartSec=5s
+EnvironmentFile=-/etc/authnull/app.env
+
+# Capabilities granted directly by systemd. CAP_NET_BIND_SERVICE lets the
+# proxy bind privileged ports 88, 389, 636 without running as root.
+# CAP_NET_ADMIN is required for the NTLM bypass gate (Path 3A) — the proxy
+# manages a kernel ipset (`authnull_active`) that the iptables rules use to
+# conditionally DNAT DC-adjacent ports. Without CAP_NET_ADMIN, the gate
+# logs "ntlm gate inactive" at startup and NTLM fallback is no longer
+# blocked, leaving a known bypass open.
+#
+# Ambient (vs File) capabilities work with NoNewPrivileges=true; setcap on
+# the binary alone does not.
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+
+# Sandboxing
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/authnull /var/log/authnull
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
