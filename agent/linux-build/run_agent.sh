@@ -195,7 +195,7 @@ fi
   if agent_status "$service_binary"; then
     echo -e "${YELLOW}=> Stopping existing agent service...${NC}${NORMAL}"
     sudo systemctl stop db-agent.service || echo "Service not running, continuing..."
-    sudo systemctl disable db-agent.service || echo "Service not enabled, continuing..."
+    # sudo systemctl disable db-agent.service || echo "Service not enabled, continuing..."
     sudo systemctl daemon-reload
   fi
   if [ ! -d "$dir" ]; then
@@ -618,19 +618,11 @@ elif [ "$ACTION" = "update" ]; then
     # Download latest agent
     wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent || print_error "Failed to download agent binary."
     
-    # If download created a file with different name, rename it
-    if [ ! -f "db-agent" ] && [ -f "database-agent" ]; then
-        mv database-agent db-agent
-        echo -e "${YELLOW}=> Renamed downloaded file to db-agent${NC}${NORMAL}"
-    fi
-    
     # Make the agent file executable
-    chmod +x db-agent || print_error "Failed to make db-agent executable."
+    chmod +x db-agent
     echo -e "${GREEN}=> Agent binary downloaded and made executable.${NC}${NORMAL}"
     
-    echo -e "${GREEN}=> Replacing agent binary...${NC}${NORMAL}"
-    cp db-agent /opt/authnull-db-agent/db-agent || print_error "Failed to copy agent binary."
-    
+
     echo -e "${GREEN}=> Starting agent service...${NC}${NORMAL}"
     sudo systemctl start db-agent.service || print_error "Failed to start db-agent service."
     sleep 3
@@ -638,7 +630,7 @@ elif [ "$ACTION" = "update" ]; then
     echo -e "${GREEN}=> Checking agent service status...${NC}${NORMAL}"
     if agent_status "$service_binary"; then
         echo -e "${GREEN}=> Agent service is running successfully.${NC}${NORMAL}"
-        systemctl status db-agent --no-pager
+        systemctl status db-agent
     else
         echo -e "${RED}=> ERROR: Agent service failed to start after update.${NC}${NORMAL}"
         exit 1
