@@ -5,7 +5,7 @@ set -e
 ACTION="$1" # add or delete or modify
 
 if [ -z "$ACTION" ]; then
-    echo "Usage: $0 {install|add|delete|modify}"
+    echo "Usage: $0 {install|add|delete|modify|update|uninstall}"
     exit 1
 fi
 
@@ -205,8 +205,8 @@ fi
   else
     echo "Directory already exists: $dir"
     cd "$dir" || exit 1
-    echo -e "${YELLOW}=> Cleaning up existing files...${NC}${NORMAL}"    
-    rm -rf ./*    
+    # echo -e "${YELLOW}=> Cleaning up existing files...${NC}${NORMAL}"    
+    # rm -rf ./*    
   fi
   
   echo -e "${GREEN}=> Downloading the agent file...${NC}${NORMAL}"
@@ -582,6 +582,129 @@ elif [ "$ACTION" = "modify" ]; then
     echo -e "${GREEN}=> Restarting agent service to apply changes...${NC}${NORMAL}"
     sudo systemctl restart db-agent || print_error "Failed to restart db-agent service."
     echo -e "${GREEN}=> Agent service restarted successfully.${NC}${NORMAL}"
+
+elif [ "$ACTION" = "update" ]; then
+    echo -e "${GREEN}=> Starting Database Agent Update...${NC}${NORMAL}"
+    
+    # Check if running as root or with sudo
+    if [ "$EUID" -ne 0 ]; then
+        echo "This script must be run as root or with sudo."
+        exit 1
+    fi
+    
+    if [ ! -d "$dir" ]; then
+        echo "Directory does not exist: $dir"
+        exit 1
+    fi
+    
+    echo -e "${YELLOW}=> Stopping existing agent service...${NC}${NORMAL}"
+    if agent_status "$service_binary"; then
+        sudo systemctl stop db-agent.service || print_error "Failed to stop db-agent service."
+        sleep 2
+        echo -e "${GREEN}=> Agent service stopped successfully.${NC}${NORMAL}"
+    else
+        echo -e "${YELLOW}=> Agent service is not running.${NC}${NORMAL}"
+    fi
+    
+    cd "$dir" || exit 1
+    
+    echo -e "${GREEN}=> Downloading the latest agent binary from git...${NC}${NORMAL}"
+    # Backup existing agent
+    if [ -f "db-agent" ]; then
+        cp db-agent db-agent.backup
+        echo -e "${YELLOW}=> Backed up existing agent to db-agent.backup${NC}${NORMAL}"
+    fi
+    
+    # Download latest agent
+    wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent || print_error "Failed to download agent binary."
+    
+    # If download created a file with different name, rename it
+    if [ ! -f "db-agent" ] && [ -f "database-agent" ]; then
+        mv database-agent db-agent
+        echo -e "${YELLOW}=> Renamed downloaded file to db-agent${NC}${NORMAL}"
+    fi
+    
+    # Make the agent file executable
+    chmod +x db-agent || print_error "Failed to make db-agent executable."
+    echo -e "${GREEN}=> Agent binary downloaded and made executable.${NC}${NORMAL}"
+    
+    echo -e "${GREEN}=> Replacing agent binary...${NC}${NORMAL}"
+    cp db-agent /opt/authnull-db-agent/db-agent || print_error "Failed to copy agent binary."
+    
+    echo -e "${GREEN}=> Starting agent service...${NC}${NORMAL}"
+    sudo systemctl start db-agent.service || print_error "Failed to start db-agent service."
+    sleep 3
+    
+    echo -e "${GREEN}=> Checking agent service status...${NC}${NORMAL}"
+    if agent_status "$service_binary"; then
+        echo -e "${GREEN}=> Agent service is running successfully.${NC}${NORMAL}"
+        systemctl status db-agent --no-pager
+    else
+        echo -e "${RED}=> ERROR: Agent service failed to start after update.${NC}${NORMAL}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}=> Database Agent Update completed successfully!${NC}${NORMAL}"
+
+elif [ "$ACTION" = "uninstall" ]; then
+    echo -e "${GREEN}=> Starting Database Agent Uninstall...${NC}${NORMAL}"
+    
+    # Check if running as root or with sudo
+    if [ "$EUID" -ne 0 ]; then
+        echo "This script must be run as root or with sudo."
+        exit 1
+    fi
+    
+    # Confirmation prompt
+    echo -e "${RED}WARNING: This will remove the database agent service and all associated files.${NC}${NORMAL}"
+    read -rp "Are you sure you want to uninstall? (yes/no): " confirm
+    if [[ "$confirm" != "yes" ]]; then
+        echo "Uninstall cancelled."
+        exit 0
+    fi
+    
+    echo -e "${YELLOW}=> Checking if agent service is running...${NC}${NORMAL}"
+    if agent_status "$service_binary"; then
+        echo -e "${YELLOW}=> Stopping agent service...${NC}${NORMAL}"
+        sudo systemctl stop db-agent.service || print_error "Failed to stop db-agent service."
+        sleep 2
+        echo -e "${GREEN}=> Agent service stopped successfully.${NC}${NORMAL}"
+    else
+        echo -e "${YELLOW}=> Agent service is not running.${NC}${NORMAL}"
+    fi
+    
+    echo -e "${YELLOW}=> Disabling agent service from boot...${NC}${NORMAL}"
+    sudo systemctl disable db-agent.service 2>/dev/null || echo "Service was not enabled."
+    
+    echo -e "${YELLOW}=> Removing service file...${NC}${NORMAL}"
+    if [ -f "$service_dst" ]; then
+        sudo rm -f "$service_dst"
+        echo -e "${GREEN}=> Service file removed: $service_dst${NC}${NORMAL}"
+    fi
+    
+    if [ -f "$service_src" ]; then
+        rm -f "$service_src"
+        echo -e "${GREEN}=> Service file removed: $service_src${NC}${NORMAL}"
+    fi
+    
+    echo -e "${YELLOW}=> Reloading systemd daemon...${NC}${NORMAL}"
+    sudo systemctl daemon-reload || echo "Failed to reload systemd daemon."
+    
+    
+    echo -e "${YELLOW}=> Removing agent directory: $dir${NC}${NORMAL}"
+    if [ -d "$dir" ]; then
+        rm -rf "$dir"
+        echo -e "${GREEN}=> Agent directory removed: $dir${NC}${NORMAL}"
+    fi
+    
+    echo -e "${YELLOW}=> Verifying service removal...${NC}${NORMAL}"
+    if ! agent_status "$service_binary"; then
+        echo -e "${GREEN}=> Confirmed: Agent service is not running.${NC}${NORMAL}"
+    else
+        echo -e "${RED}=> WARNING: Agent process still detected.${NC}${NORMAL}"
+    fi
+    
+    echo -e "${GREEN}=> Database Agent Uninstall completed successfully!${NC}${NORMAL}"
     
 fi
 
