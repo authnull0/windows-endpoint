@@ -8,18 +8,16 @@ tls:
   client_ca: /etc/authnull/certs/ca.crt  # mTLS: validate proxies
 
 # MFA factor issuance delegates to the authsec do-authenticationV4 endpoint.
-# Leave base_url / base_url_env empty to use NoopBridge (local tests only).
-#
-# Production: leave all values blank here and set them in /etc/authnull/app.env.
-# The *_env fields tell the control plane which env var to read at startup.
+# Leave base_url empty to use NoopBridge (tests only — challenges must then
+# be resolved via /api/v1/admin/challenges/{id}/{approve|deny}).
 mfa_bridge:
-  base_url: ""              # or set via AUTHNULL_BASE_URL in app.env
+  base_url: "https://prod.api.authnull.com/authnull0/api/v1/authn/v3/do-authenticationV4"
   base_url_env: AUTHNULL_BASE_URL
-  email_domain: ""          # or set via AUTHNULL_EMAIL_DOMAIN in app.env
+  email_domain: ""          # set via AUTHNULL_EMAIL_DOMAIN in app.env
   email_domain_env: AUTHNULL_EMAIL_DOMAIN
-  org_id: 0                 # or set via AUTHNULL_ORG_ID in app.env
+  org_id: 0                 # set via AUTHNULL_ORG_ID in app.env
   org_id_env: AUTHNULL_ORG_ID
-  tenant_id: 0              # or set via AUTHNULL_TENANT_ID in app.env
+  tenant_id: 0              # set via AUTHNULL_TENANT_ID in app.env
   tenant_id_env: AUTHNULL_TENANT_ID
   timeout_sec: 90
 
