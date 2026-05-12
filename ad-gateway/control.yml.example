@@ -29,6 +29,19 @@ log_level: info
 # returns mfa_required. A real PDP (authsec / external policy service)
 # will plug in via the decision.Engine interface when it lands.
 
+# AD user sync — built-in replacement for the Windows ad-sync-agent.
+# Connects to AD via LDAP and pushes users to ad-service on a schedule.
+# Leave ldap_url blank to disable.
+#
+# ad_sync:
+#   ldap_url: "ldap://10.4.0.17:389"
+#   bind_dn: "CN=AuthNullSvc,CN=Users,DC=testad,DC=com"
+#   bind_password_env: "AD_SYNC_BIND_PW"
+#   base_dn: "DC=testad,DC=com"
+#   domain_id: 1
+#   interval_minutes: 10
+#   insecure_skip_verify: false
+
 # AD admin (optional): privileged LDAP bind for the unlock-account action
 # exposed at POST /api/v1/diagnostics/unlock. Leave the entire block
 # COMMENTED OUT for default deployments — the customer requirement is

@@ -2,31 +2,34 @@
 # AuthNull AD Gateway — one-shot installer
 #
 # Usage (on the gateway Linux VM, as root):
-#   curl -fsSL https://raw.githubusercontent.com/authnull0/windows-endpoint/main/ad-gateway/install.sh | sudo bash
 #
-# Or with a private-repo token:
-#   TOKEN=ghp_... curl -fsSL \
-#     -H "Authorization: token $TOKEN" \
-#     https://raw.githubusercontent.com/authnull0/windows-endpoint/main/ad-gateway/install.sh | sudo bash
+#   Option A — UI-generated configs (recommended):
+#     Place proxy.yml, control.yml, app.env in the same directory as this
+#     script, then run:
+#       sudo bash install.sh
+#
+#   Option B — bare install (configure manually afterwards):
+#       sudo bash install.sh
 #
 # What it does:
-#   1. Installs system packages (ipset, iptables-persistent, ldap-utils, smbclient)
+#   1. Installs system packages (ipset, iptables-persistent, ldap-utils)
 #   2. Creates the 'authnull' service user and working directories
-#   3. Downloads binaries + support files from the ad-gateway folder of this repo
-#   4. Verifies SHA256 checksums
-#   5. Installs systemd units (disabled; you start them after configuring)
-#   6. Places /etc/authnull/{proxy,control}.yml.example for you to edit
-#
-# After install, see /etc/authnull/proxy.yml.example and control.yml.example,
-# then: sudo systemctl edit ad-gateway-control   (add secrets)
-#       sudo systemctl enable --now ad-gateway-proxy ad-gateway-control
+#   3. Downloads binaries from GitHub Releases and verifies SHA256 checksums
+#   4. Installs systemd units
+#   5. Places config files:
+#        - If proxy.yml / control.yml / app.env exist alongside this script,
+#          they are copied to /etc/authnull/ (UI-generated flow).
+#        - Otherwise, .example files are placed for manual editing.
 
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-REPO_RAW="https://raw.githubusercontent.com/authnull0/windows-endpoint/main/ad-gateway"
+GITHUB_REPO="authnull0/windows-endpoint"
+RELEASE_BASE="https://github.com/${GITHUB_REPO}/releases/latest/download"
+RAW_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/main/ad-gateway"
+
 INSTALL_BIN="/usr/local/bin"
 INSTALL_ETC="/etc/authnull"
 INSTALL_LIB="/var/lib/authnull"
@@ -34,11 +37,9 @@ INSTALL_LOG="/var/log/authnull"
 INSTALL_OPT="/opt/authnull"
 SERVICE_USER="authnull"
 
-# Optional: set TOKEN in env for private-repo access
-GITHUB_AUTH_HEADER=""
-if [[ -n "${TOKEN:-}" ]]; then
-    GITHUB_AUTH_HEADER="Authorization: token ${TOKEN}"
-fi
+# Directory this script lives in — used to detect UI-generated configs placed
+# alongside the script by the admin.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -50,9 +51,7 @@ fatal() { echo -e "\033[0;31mFATAL:\033[0m $*" >&2; exit 1; }
 
 fetch() {
     local url="$1" dest="$2"
-    local args=(-fsSL "$url" -o "$dest")
-    [[ -n "$GITHUB_AUTH_HEADER" ]] && args+=(-H "$GITHUB_AUTH_HEADER")
-    curl "${args[@]}" || fatal "Download failed: $url"
+    curl -fsSL "$url" -o "$dest" || fatal "Download failed: $url"
 }
 
 require_root() {
@@ -60,15 +59,10 @@ require_root() {
 }
 
 detect_distro() {
-    if command -v apt-get &>/dev/null; then
-        echo "apt"
-    elif command -v dnf &>/dev/null; then
-        echo "dnf"
-    elif command -v yum &>/dev/null; then
-        echo "yum"
-    else
-        echo "unknown"
-    fi
+    if command -v apt-get &>/dev/null; then echo "apt"
+    elif command -v dnf &>/dev/null;   then echo "dnf"
+    elif command -v yum &>/dev/null;   then echo "yum"
+    else echo "unknown"; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -79,7 +73,6 @@ require_root
 info "AuthNull AD Gateway installer"
 echo
 
-# Detect architecture
 ARCH=$(uname -m)
 case "$ARCH" in
     x86_64)  ARCH_SUFFIX="linux-amd64" ;;
@@ -90,6 +83,15 @@ ok "Architecture: $ARCH_SUFFIX"
 
 DISTRO=$(detect_distro)
 ok "Package manager: $DISTRO"
+
+# Detect whether the admin placed UI-generated configs alongside this script
+UI_CONFIGS=false
+if [[ -f "$SCRIPT_DIR/proxy.yml" && -f "$SCRIPT_DIR/control.yml" && -f "$SCRIPT_DIR/app.env" ]]; then
+    UI_CONFIGS=true
+    ok "UI-generated config files detected — will use those"
+else
+    warn "No pre-placed config files found — example configs will be installed for manual editing"
+fi
 
 # ---------------------------------------------------------------------------
 # Phase 1 — System packages
@@ -131,16 +133,16 @@ mkdir -p "$INSTALL_OPT/iptables"
 ok "Directories created"
 
 # ---------------------------------------------------------------------------
-# Phase 3 — Download binaries
+# Phase 3 — Download binaries from GitHub Releases
 # ---------------------------------------------------------------------------
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-info "Downloading binaries from authnull0/windows-endpoint"
+info "Downloading binaries from github.com/${GITHUB_REPO} releases"
 
-fetch "$REPO_RAW/ad-gateway-proxy-${ARCH_SUFFIX}"    "$TMPDIR/ad-gateway-proxy"
-fetch "$REPO_RAW/ad-gateway-control-${ARCH_SUFFIX}"  "$TMPDIR/ad-gateway-control"
-fetch "$REPO_RAW/SHA256SUMS"                          "$TMPDIR/SHA256SUMS"
+fetch "${RELEASE_BASE}/ad-gateway-proxy-${ARCH_SUFFIX}"    "$TMPDIR/ad-gateway-proxy"
+fetch "${RELEASE_BASE}/ad-gateway-control-${ARCH_SUFFIX}"  "$TMPDIR/ad-gateway-control"
+fetch "${RELEASE_BASE}/SHA256SUMS"                          "$TMPDIR/SHA256SUMS"
 ok "Binaries downloaded"
 
 # ---------------------------------------------------------------------------
@@ -149,15 +151,13 @@ ok "Binaries downloaded"
 info "Verifying checksums"
 pushd "$TMPDIR" >/dev/null
 
-# SHA256SUMS contains entries for both arch variants; filter to ours
 grep "$ARCH_SUFFIX" SHA256SUMS > SHA256SUMS.local 2>/dev/null || true
 if [[ -s SHA256SUMS.local ]]; then
-    # Rename entries to match the bare filenames we downloaded
     sed -i "s/-${ARCH_SUFFIX}//g" SHA256SUMS.local
-    sha256sum -c SHA256SUMS.local || fatal "Checksum mismatch — aborting. Re-run to retry."
-    ok "Checksums OK"
+    sha256sum -c SHA256SUMS.local || fatal "Checksum mismatch — download may be corrupted. Re-run to retry."
+    ok "Checksums verified"
 else
-    warn "No arch-specific entries in SHA256SUMS — skipping verification (add them to the release)"
+    warn "No arch-specific entries in SHA256SUMS — skipping verification"
 fi
 
 popd >/dev/null
@@ -174,56 +174,94 @@ ok "Binaries installed"
 # Phase 6 — Support scripts
 # ---------------------------------------------------------------------------
 info "Installing support scripts"
-fetch "$REPO_RAW/deployment/ntlm-gate.sh" "$INSTALL_OPT/iptables/ntlm-gate.sh"
+fetch "$RAW_BASE/deployment/ntlm-gate.sh" "$INSTALL_OPT/iptables/ntlm-gate.sh"
 chmod +x "$INSTALL_OPT/iptables/ntlm-gate.sh"
 ok "ntlm-gate.sh installed to $INSTALL_OPT/iptables/"
-# Note: apply-dns-cutover.ps1 and RefreshDCLocator.ps1 are PowerShell scripts
-# for the DC admin — download them from the repo on the Windows DC, not here.
 
 # ---------------------------------------------------------------------------
-# Phase 7 — Config examples
+# Phase 7 — Config files
 # ---------------------------------------------------------------------------
-info "Installing config examples"
-fetch "$REPO_RAW/proxy.yml.example"   "$INSTALL_ETC/proxy.yml.example"
-fetch "$REPO_RAW/control.yml.example" "$INSTALL_ETC/control.yml.example"
-fetch "$REPO_RAW/app.env.example"     "$INSTALL_ETC/app.env.example"
+info "Installing config files"
 
-# Place real configs only if they don't already exist (don't overwrite on upgrade)
-if [[ ! -f "$INSTALL_ETC/proxy.yml" ]]; then
-    cp "$INSTALL_ETC/proxy.yml.example"   "$INSTALL_ETC/proxy.yml"
-    chown "$SERVICE_USER:$SERVICE_USER"   "$INSTALL_ETC/proxy.yml"
-    ok "proxy.yml placed (edit before starting)"
-else
-    ok "proxy.yml already exists — not overwritten"
-fi
+if [[ "$UI_CONFIGS" == "true" ]]; then
+    # UI-generated flow: configs already filled in, just place them.
+    # Don't overwrite if already present (e.g. re-running installer after upgrade).
+    for cfg in proxy.yml control.yml; do
+        if [[ ! -f "$INSTALL_ETC/$cfg" ]]; then
+            install -m 0640 -o "$SERVICE_USER" -g "$SERVICE_USER" \
+                "$SCRIPT_DIR/$cfg" "$INSTALL_ETC/$cfg"
+            ok "$cfg installed to $INSTALL_ETC/"
+        else
+            ok "$cfg already exists — not overwritten"
+        fi
+    done
 
-if [[ ! -f "$INSTALL_ETC/control.yml" ]]; then
-    cp "$INSTALL_ETC/control.yml.example"  "$INSTALL_ETC/control.yml"
-    chown "$SERVICE_USER:$SERVICE_USER"    "$INSTALL_ETC/control.yml"
-    ok "control.yml placed (edit before starting)"
-else
-    ok "control.yml already exists — not overwritten"
-fi
+    # app.env has tighter permissions: root:authnull 640
+    if [[ ! -f "$INSTALL_ETC/app.env" ]]; then
+        install -m 0640 -o root -g "$SERVICE_USER" \
+            "$SCRIPT_DIR/app.env" "$INSTALL_ETC/app.env"
+        ok "app.env installed to $INSTALL_ETC/ (root:authnull 640)"
+    else
+        ok "app.env already exists — not overwritten"
+    fi
 
-if [[ ! -f "$INSTALL_ETC/app.env" ]]; then
-    cp "$INSTALL_ETC/app.env.example"  "$INSTALL_ETC/app.env"
-    chown root:"$SERVICE_USER"         "$INSTALL_ETC/app.env"
-    chmod 640                          "$INSTALL_ETC/app.env"
-    ok "app.env placed — fill in AUTHNULL_ORG_ID, AUTHNULL_TENANT_ID, tokens, etc."
+    # Prompt for the AD service account password if not already set.
+    # The password is entered locally on this VM — it is never transmitted to
+    # the UI or any remote service.
+    if grep -q "^AD_SYNC_BIND_PW=$" "$INSTALL_ETC/app.env" 2>/dev/null; then
+        echo
+        echo "  The AD service account password is required for user sync."
+        echo "  It will be written only to $INSTALL_ETC/app.env (root:authnull 640)"
+        echo "  and is never sent to the AuthNull server or stored anywhere else."
+        echo
+        read -rsp "  Enter AD service account password: " _bind_pw
+        echo
+        sed -i "s|^AD_SYNC_BIND_PW=.*|AD_SYNC_BIND_PW=${_bind_pw}|" "$INSTALL_ETC/app.env"
+        unset _bind_pw
+        ok "AD service account password saved to $INSTALL_ETC/app.env"
+    fi
 else
-    ok "app.env already exists — not overwritten"
+    # Bare install: fetch examples from repo for manual editing.
+    fetch "$RAW_BASE/proxy.yml.example"   "$INSTALL_ETC/proxy.yml.example"
+    fetch "$RAW_BASE/control.yml.example" "$INSTALL_ETC/control.yml.example"
+    fetch "$RAW_BASE/app.env.example"     "$INSTALL_ETC/app.env.example"
+
+    [[ ! -f "$INSTALL_ETC/proxy.yml" ]]   && cp "$INSTALL_ETC/proxy.yml.example"   "$INSTALL_ETC/proxy.yml"
+    [[ ! -f "$INSTALL_ETC/control.yml" ]] && cp "$INSTALL_ETC/control.yml.example" "$INSTALL_ETC/control.yml"
+    if [[ ! -f "$INSTALL_ETC/app.env" ]]; then
+        cp "$INSTALL_ETC/app.env.example" "$INSTALL_ETC/app.env"
+        chown root:"$SERVICE_USER" "$INSTALL_ETC/app.env"
+        chmod 640 "$INSTALL_ETC/app.env"
+    fi
+    ok "Example configs placed — edit /etc/authnull/*.yml and app.env before starting"
+
+    # In bare-install mode the admin will edit configs manually, but we can
+    # still collect the password now so they don't have to edit app.env by hand.
+    echo
+    echo "  You can enter the AD service account password now, or leave blank"
+    echo "  and set AD_SYNC_BIND_PW manually in $INSTALL_ETC/app.env later."
+    echo
+    read -rsp "  AD service account password (leave blank to skip): " _bind_pw
+    echo
+    if [[ -n "$_bind_pw" ]]; then
+        sed -i "s|^AD_SYNC_BIND_PW=.*|AD_SYNC_BIND_PW=${_bind_pw}|" "$INSTALL_ETC/app.env"
+        unset _bind_pw
+        ok "AD service account password saved to $INSTALL_ETC/app.env"
+    else
+        warn "Skipped — remember to set AD_SYNC_BIND_PW in $INSTALL_ETC/app.env"
+    fi
 fi
 
 # ---------------------------------------------------------------------------
 # Phase 8 — systemd units
 # ---------------------------------------------------------------------------
 info "Installing systemd units"
-fetch "$REPO_RAW/systemd/ad-gateway-proxy.service"   \
+fetch "$RAW_BASE/systemd/ad-gateway-proxy.service"   \
     "/etc/systemd/system/ad-gateway-proxy.service"
-fetch "$REPO_RAW/systemd/ad-gateway-control.service" \
+fetch "$RAW_BASE/systemd/ad-gateway-control.service" \
     "/etc/systemd/system/ad-gateway-control.service"
 systemctl daemon-reload
-ok "systemd units installed (not started yet)"
+ok "systemd units installed"
 
 # ---------------------------------------------------------------------------
 # Done
@@ -232,41 +270,49 @@ PROXY_VER=$("$INSTALL_BIN/ad-gateway-proxy"   --version 2>/dev/null || echo "ins
 CTRL_VER=$( "$INSTALL_BIN/ad-gateway-control" --version 2>/dev/null || echo "installed")
 
 echo
-echo "┌─────────────────────────────────────────────────────────────────┐"
-echo "│  AuthNull AD Gateway — installation complete                   │"
-echo "└─────────────────────────────────────────────────────────────────┘"
+echo "┌──────────────────────────────────────────────────────────────────┐"
+echo "│  AuthNull AD Gateway — installation complete                    │"
+echo "└──────────────────────────────────────────────────────────────────┘"
 echo
 echo "  ad-gateway-proxy   : $PROXY_VER"
 echo "  ad-gateway-control : $CTRL_VER"
 echo
-echo "Next steps:"
-echo
-echo "  1. Fill in /etc/authnull/app.env  ← start here"
-echo "       AUTHNULL_ORG_ID, AUTHNULL_TENANT_ID  — from your AuthNull tenant dashboard"
-echo "       AUTHNULL_EMAIL_DOMAIN  — e.g. your-company.com"
-echo "       AD_BIND_PW  — only if you enabled ad.ldap_url in control.yml"
-echo
-echo "  2. Edit /etc/authnull/proxy.yml"
-echo "       Set: realm, upstream_kdc, upstream_ldap, control_plane_url"
-echo
-echo "  3. Edit /etc/authnull/control.yml  (mfa_bridge.* already reads from app.env)"
-echo "       Uncomment ad: block only if you want the optional unlock-account action"
-echo
-echo "  4. Apply the NTLM-bypass iptables gate:"
-echo "       sudo DC_IP=<DC_IP> GW_IP=<GATEWAY_IP> bash $INSTALL_OPT/iptables/ntlm-gate.sh"
-echo
-echo "  5. Start services:"
-echo "       sudo systemctl enable --now ad-gateway-control ad-gateway-proxy"
-echo "       sudo journalctl -u ad-gateway-proxy -u ad-gateway-control -n 30 --no-pager"
-echo
-echo "  Healthy startup shows:"
-echo "    kdc proxy listening | ldap proxy listening | smb proxy listening"
-echo "    uplink enabled | ad admin enabled | mfa challenge store cooldown_sec=180"
-echo
-echo "  DNS cutover (run on the DC as Domain Admin — PowerShell, download from repo):"
-echo "    https://github.com/authnull0/windows-endpoint/tree/main/ad-gateway/deployment"
-echo "    apply-dns-cutover.ps1  — adds SRV records + demotes DC priority"
-echo "    RefreshDCLocator.ps1   — run on each Windows client after cutover"
-echo
-echo "  Full install guide: https://docs.authnull.com/ad-gateway/install"
+
+if [[ "$UI_CONFIGS" == "true" ]]; then
+    echo "  Configs installed from UI-generated files."
+    echo
+    echo "  Start services:"
+    echo "    sudo systemctl enable --now ad-gateway-control ad-gateway-proxy"
+    echo "    sudo journalctl -u ad-gateway-proxy -u ad-gateway-control -f"
+    echo
+    echo "  Then run the DC setup script (on the Domain Controller as Domain Admin):"
+    echo "    .\\dc-setup.ps1"
+    echo
+else
+    echo "  Next steps:"
+    echo
+    echo "  1. Fill in /etc/authnull/app.env  (all service URLs + adsync config live here)"
+    echo "       AD_SERVICE_URL       — e.g. https://dev.api.authnull.com"
+    echo "       POLICY_SERVICE_URL   — e.g. https://dev.api.authnull.com"
+    echo "       AUTHNULL_UPLINK_URL  — e.g. https://dev.api.authnull.com"
+    echo "       AD_ORG_ID / AD_TENANT_ID"
+    echo "       AD_SYNC_LDAP_URL     — e.g. ldap://10.4.0.17:389"
+    echo "       AD_SYNC_BIND_DN      — e.g. CN=AuthNullSvc,CN=Users,DC=authnull,DC=lab"
+    echo "       AD_SYNC_BASE_DN      — e.g. DC=authnull,DC=lab"
+    echo "       AD_SYNC_DOMAIN_ID    — numeric domain ID from the AuthNull UI"
+    echo "       AD_SYNC_BIND_PW      — service account password"
+    echo
+    echo "  2. Edit /etc/authnull/proxy.yml"
+    echo "       realm, upstream_kdc, upstream_ldap, control_plane_url"
+    echo
+    echo "  3. Edit /etc/authnull/control.yml"
+    echo "       gateway_id  (all other values are read from app.env at runtime)"
+    echo
+    echo "  4. Start services:"
+    echo "       sudo systemctl enable --now ad-gateway-control ad-gateway-proxy"
+    echo
+fi
+
+echo "  Apply iptables NTLM gate (optional, recommended for enforce mode):"
+echo "    sudo DC_IP=<DC_IP> GW_IP=<GW_IP> bash $INSTALL_OPT/iptables/ntlm-gate.sh"
 echo
