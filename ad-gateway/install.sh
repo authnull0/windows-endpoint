@@ -93,6 +93,14 @@ else
     warn "No pre-placed config files found — example configs will be installed for manual editing"
 fi
 
+# Detect whether pre-built binaries are placed alongside this script.
+# If present, they are used directly and the GitHub release download is skipped.
+LOCAL_BINS=false
+if [[ -f "$SCRIPT_DIR/ad-gateway-proxy" && -f "$SCRIPT_DIR/ad-gateway-control" ]]; then
+    LOCAL_BINS=true
+    ok "Pre-built binaries detected alongside script — skipping release download"
+fi
+
 # ---------------------------------------------------------------------------
 # Phase 1 — System packages
 # ---------------------------------------------------------------------------
@@ -133,34 +141,24 @@ mkdir -p "$INSTALL_OPT/iptables"
 ok "Directories created"
 
 # ---------------------------------------------------------------------------
-# Phase 3 — Download binaries from GitHub Releases
+# Phase 3 — Binaries (local or GitHub Releases)
 # ---------------------------------------------------------------------------
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-info "Downloading binaries from github.com/${GITHUB_REPO} releases"
-
-fetch "${RELEASE_BASE}/ad-gateway-proxy-${ARCH_SUFFIX}"    "$TMPDIR/ad-gateway-proxy"
-fetch "${RELEASE_BASE}/ad-gateway-control-${ARCH_SUFFIX}"  "$TMPDIR/ad-gateway-control"
-fetch "${RELEASE_BASE}/SHA256SUMS"                          "$TMPDIR/SHA256SUMS"
-ok "Binaries downloaded"
-
-# ---------------------------------------------------------------------------
-# Phase 4 — Verify checksums
-# ---------------------------------------------------------------------------
-info "Verifying checksums"
-pushd "$TMPDIR" >/dev/null
-
-grep "$ARCH_SUFFIX" SHA256SUMS > SHA256SUMS.local 2>/dev/null || true
-if [[ -s SHA256SUMS.local ]]; then
-    sed -i "s/-${ARCH_SUFFIX}//g" SHA256SUMS.local
-    sha256sum -c SHA256SUMS.local || fatal "Checksum mismatch — download may be corrupted. Re-run to retry."
-    ok "Checksums verified"
+if [[ "$LOCAL_BINS" == "true" ]]; then
+    info "Using pre-built binaries from $SCRIPT_DIR"
+    cp "$SCRIPT_DIR/ad-gateway-proxy"   "$TMPDIR/ad-gateway-proxy"
+    cp "$SCRIPT_DIR/ad-gateway-control" "$TMPDIR/ad-gateway-control"
+    ok "Binaries copied from local directory"
 else
-    warn "No arch-specific entries in SHA256SUMS — skipping verification"
+    info "Downloading binaries from github.com/${GITHUB_REPO} main"
+    fetch "${RAW_BASE}/ad-gateway-proxy-${ARCH_SUFFIX}"   "$TMPDIR/ad-gateway-proxy"
+    fetch "${RAW_BASE}/ad-gateway-control-${ARCH_SUFFIX}" "$TMPDIR/ad-gateway-control"
+    ok "Binaries downloaded"
 fi
 
-popd >/dev/null
+# Phase 4 — checksum verification skipped (binaries served from raw GitHub main)
 
 # ---------------------------------------------------------------------------
 # Phase 5 — Install binaries
