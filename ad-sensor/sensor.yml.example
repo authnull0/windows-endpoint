@@ -1,0 +1,57 @@
+# Authnull DC Sensor — Configuration
+# Copy this file to C:\ProgramData\Authnull\sensor.yml and fill in your values.
+
+# ── Backend ────────────────────────────────────────────────────────────────────
+ad_service_url: "https://prod.api.authnull.com"
+policy_service_url: "https://prod.api.authnull.com"
+
+# Obtain tenant_id and org_id from the Authnull dashboard
+tenant_id: 1
+org_id: 0
+
+# Default AD domain FQDN — used when auth events don't include a domain name
+default_domain: "yourdomain.local"
+
+# ── AD Sync ────────────────────────────────────────────────────────────────────
+ad_sync_enabled: true
+
+# Domain ID from the Authnull dashboard (Active Directory → your domain → ID)
+ad_sync_domain_id: 0
+
+# LDAP base DN for user sync — matches your AD structure
+ad_sync_base_dn: "DC=yourdomain,DC=local"
+
+# Only sync users who are members of these groups (leave empty to sync all users)
+ad_sync_filter_groups:
+  - "Domain Users"
+
+# Only sync users in these OUs (leave empty to sync all OUs)
+ad_sync_filter_ous:
+  - "OU=CorpUsers"
+
+# ── Interception ───────────────────────────────────────────────────────────────
+# Enable WinDivert packet-level Kerberos interception (recommended)
+windivert_enabled: true
+
+# Enable Windows Filtering Platform enforcement (required for NTLM fallback blocking)
+wfp_enabled: true
+
+# Per-resource MFA: intercept TGS-REP for these service classes
+# Requires windivert_enabled: true
+# Leave empty to disable per-resource MFA (only login MFA fires)
+tgs_protected_spns:
+  - "cifs/*"
+
+# ── Enforcement ────────────────────────────────────────────────────────────────
+# "enforce" = block/allow per verdict | "monitor" = log only, never block
+mode: "enforce"
+
+# How long (ms) an MFA approval is cached before requiring a new push
+# Default: 120000 (2 minutes)
+allow_deduplication_window_ms: 120000
+
+# What to do if the Authnull backend is unreachable: "allow" or "deny"
+fallback_action: "deny"
+
+# ── Logging ────────────────────────────────────────────────────────────────────
+log_file: "C:\\ProgramData\\Authnull\\sensor.log"
