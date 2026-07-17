@@ -475,6 +475,9 @@ if [ -z "$ORG_ID" ] || [ -z "$TENANT_ID" ]; then
     print_error "ORG_ID or TENANT_ID not set in $env_file"
 fi
 
+if [ -z "$API_URL" ]; then
+    API_URL="https://onprem.prod.authnull.com/authnull0/api/v1/authn/v3/do-authenticationV4"
+fi
 
 # Add authnull section to proxysql.cnf
 cat >> /etc/proxysql.cnf << EOL
@@ -483,7 +486,7 @@ authnull =
 {
     org_id = $ORG_ID
     tenant_id = $TENANT_ID
-    api_url = "https://prod.api.authnull.com/authnull0/api/v1/authn/v3/do-authenticationV4"
+    api_url = "$API_URL"
 }
 EOL
 [ $? -eq 0 ] || print_error "Failed to update /etc/proxysql.cnf."
