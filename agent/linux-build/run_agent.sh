@@ -471,12 +471,37 @@ sed -i 's/\r$//' "$env_file"
 set -a
 source "$env_file"
 set +a
-if [ -z "$ORG_ID" ] || [ -z "$TENANT_ID" ]; then
-    print_error "ORG_ID or TENANT_ID not set in $env_file"
+
+# ORG_ID, TENANT_ID and API are customer-specific — every environment talks to
+# its own AuthNull host, so none of these may fall back to a shared default.
+# Prompt for whichever is missing and persist it to db.env for future add/update/modify runs.
+if [ -z "$ORG_ID" ]; then
+    read -rp "Enter ORG_ID for this environment: " ORG_ID
+    ORG_ID="$(echo "$ORG_ID" | xargs)"
+    [ -n "$ORG_ID" ] || print_error "ORG_ID is required."
+    echo "ORG_ID=$ORG_ID" | tee -a "$env_file" >/dev/null
 fi
 
-if [ -z "$API_URL" ]; then
-    API_URL="https://onprem.prod.authnull.com/authnull0/api/v1/authn/v3/do-authenticationV4"
+if [ -z "$TENANT_ID" ]; then
+    read -rp "Enter TENANT_ID for this environment: " TENANT_ID
+    TENANT_ID="$(echo "$TENANT_ID" | xargs)"
+    [ -n "$TENANT_ID" ] || print_error "TENANT_ID is required."
+    echo "TENANT_ID=$TENANT_ID" | tee -a "$env_file" >/dev/null
+fi
+
+if [ -z "$API" ]; then
+    read -rp "Enter this environment's AuthNull API host (e.g. https://onprem.prod.authnull.com): " API
+    API="$(echo "$API" | xargs)"
+    [ -n "$API" ] || print_error "API is required."
+    echo "API=$API" | tee -a "$env_file" >/dev/null
+fi
+
+# The full auth endpoint is always the configured host plus this fixed path.
+API_URL="${API%/}/authnull0/api/v1/authn/v3/do-authenticationV4"
+
+print_status "Verifying API host is reachable: $API_URL"
+if ! curl -s -o /dev/null --max-time 10 "$API_URL"; then
+    print_error "Could not reach API endpoint '$API_URL'. Check the API host in $env_file and network connectivity before continuing."
 fi
 
 # Add authnull section to proxysql.cnf
