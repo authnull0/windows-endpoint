@@ -401,9 +401,22 @@ else
     cd proxysql-v3-alpha
 fi
 
-# Checkout authsql branch
-print_status "Checking out authsql branch..."
-git checkout authsql-postgres || print_error "Failed to checkout authsql branch."
+# Checkout the on-prem branch
+#
+# NOT authsql-postgres, which this used to build. That branch is behind on every change the
+# on-premise deployment needs:
+#
+#   * CURLOPT_TIMEOUT is still 30s, which aborts the request BEFORE a user can answer the push
+#     (the challenge TTL is 60s), so every MFA-gated login fails;
+#   * the [authnull] settings can only come from proxysql.cnf, not AUTHNULL_API_URL /
+#     AUTHNULL_ORG_ID / AUTHNULL_TENANT_ID in the environment;
+#   * and it predates "removed wallet dependency" (3e395b5), which is the change that makes the
+#     proxy work without a DID/VC wallet at all.
+#
+# Building authsql-postgres for an on-prem install produces a proxy that cannot complete a single
+# challenge, and the failure looks like the backend timing out rather than a wrong branch.
+print_status "Checking out on-prem branch..."
+git checkout on-prem || print_error "Failed to checkout on-prem branch."
 
 # Build ProxySQL
 print_status "Cleaning previous build..."
