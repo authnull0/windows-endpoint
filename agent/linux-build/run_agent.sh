@@ -210,7 +210,7 @@ fi
   fi
   
   echo -e "${GREEN}=> Downloading the agent file...${NC}${NORMAL}"
-  wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/on-prem/authnull-db-agent
+  wget -O db-agent https://raw.githubusercontent.com/authnull0/database-agent/on-prem/authnull-db-agent
 
   # Make the agent file executable
   echo -e "${GREEN}\n=> Making script executable...${NC}${NORMAL}"
@@ -261,7 +261,7 @@ sed -i 's/\r$//' "$env_file"
 
 # Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
-  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/on-prem/agent/linux-build/db-agent.service
+  wget https://raw.githubusercontent.com/authnull0/windows-endpoint/on-prem/agent/linux-build/db-agent.service
   
 # Check if /etc/systemd/system is writable
 if [ -w /etc/systemd/system ]; then
@@ -676,7 +676,7 @@ elif [ "$ACTION" = "update" ]; then
     fi
     
     # Download latest agent
-    wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/on-prem/authnull-db-agent || print_error "Failed to download agent binary."
+    wget -O db-agent https://raw.githubusercontent.com/authnull0/database-agent/on-prem/authnull-db-agent || print_error "Failed to download agent binary."
     
     # Make the agent file executable
     chmod +x db-agent
