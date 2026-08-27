@@ -210,7 +210,7 @@ fi
   fi
   
   echo -e "${GREEN}=> Downloading the agent file...${NC}${NORMAL}"
-  wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent
+  wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/on-prem/authnull-db-agent
 
   # Make the agent file executable
   echo -e "${GREEN}\n=> Making script executable...${NC}${NORMAL}"
@@ -261,7 +261,7 @@ sed -i 's/\r$//' "$env_file"
 
 # Download the service file
   echo -e "${GREEN}=> Downloading the service file...${NC}${NORMAL}"
-  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/postgres-db-agent/agent/linux-build/db-agent.service
+  wget https://github.com/authnull0/windows-endpoint/raw/refs/heads/on-prem/agent/linux-build/db-agent.service
   
 # Check if /etc/systemd/system is writable
 if [ -w /etc/systemd/system ]; then
@@ -490,7 +490,7 @@ if [ -z "$TENANT_ID" ]; then
 fi
 
 if [ -z "$API" ]; then
-    read -rp "Enter this environment's AuthNull API host (e.g. https://onprem.prod.authnull.com): " API
+    read -rp "Enter this environment's AuthNull API host (e.g. https://onprem.dev.authnull.com): " API
     API="$(echo "$API" | xargs)"
     [ -n "$API" ] || print_error "API is required."
     echo "API=$API" | tee -a "$env_file" >/dev/null
@@ -500,11 +500,42 @@ fi
 API_URL="${API%/}/authnull0/api/v1/authn/v3/do-authenticationV4"
 
 print_status "Verifying API host is reachable: $API_URL"
-if ! curl -s -o /dev/null --max-time 10 "$API_URL"; then
-    print_error "Could not reach API endpoint '$API_URL'. Check the API host in $env_file and network connectivity before continuing."
-fi
+# A REACHABLE HOST IS NOT A WORKING ENDPOINT.
+#
+# This used to be `curl -s -o /dev/null` and nothing else, which succeeds on ANY HTTP response --
+# including the 404 you get from a hostname that has no vhost. onprem.prod.authnull.com is exactly
+# that case: it has no server_name in nginx, so requests fall through to the first server block and
+# return 404. The installer would report the API verified, and every MFA-gated login would fail
+# afterwards with nothing pointing back here.
+#
+# do-authenticationV4 is a POST endpoint. A GET against it should not 404: a 404 means the path is
+# not routed to authn-service at all. 405 (method not allowed) or 400 both prove it IS routed, so
+# they are accepted.
+api_probe_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$API_URL" || echo 000)"
+case "$api_probe_code" in
+    000)
+        print_error "Could not reach '$API_URL' at all. Check the API host in $env_file and network connectivity."
+        ;;
+    404)
+        print_error "'$API_URL' returned 404 -- the host is reachable but this path is not routed to authn-service. Check the hostname has an nginx vhost with a /authnull0/api/v1/authn/ location (onprem.prod.authnull.com does NOT)."
+        ;;
+    5*)
+        print_error "'$API_URL' returned $api_probe_code. The endpoint is routed but the service behind it is failing; fix that before installing."
+        ;;
+    *)
+        print_status "API endpoint responded $api_probe_code (routed)."
+        ;;
+esac
 
 # Add authnull section to proxysql.cnf
+#
+# Guarded: this was an unconditional append, so running the installer twice left TWO [authnull]
+# sections in proxysql.cnf and whichever the parser reached last silently won -- including a stale
+# org_id or api_url from a previous run.
+if grep -qE '^[[:space:]]*authnull[[:space:]]*=' /etc/proxysql.cnf; then
+    print_status "An [authnull] section already exists in /etc/proxysql.cnf -- leaving it alone."
+    print_status "To change it, edit that section by hand: org_id=$ORG_ID tenant_id=$TENANT_ID api_url=$API_URL"
+else
 cat >> /etc/proxysql.cnf << EOL
 
 authnull =
@@ -515,6 +546,7 @@ authnull =
 }
 EOL
 [ $? -eq 0 ] || print_error "Failed to update /etc/proxysql.cnf."
+fi
 
 # Set permissions
 print_status "Setting permissions for /etc/proxysql.cnf..."
@@ -644,7 +676,7 @@ elif [ "$ACTION" = "update" ]; then
     fi
     
     # Download latest agent
-    wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/checkout_postgres/authnull-db-agent || print_error "Failed to download agent binary."
+    wget -O db-agent https://github.com/authnull0/database-agent/raw/refs/heads/on-prem/authnull-db-agent || print_error "Failed to download agent binary."
     
     # Make the agent file executable
     chmod +x db-agent
