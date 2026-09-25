@@ -1,0 +1,63 @@
+# AuthNull SSH proxy.
+#
+# Runs on the jump host, NOT in the compose stack. It sits on the
+# operator-to-target path, which the containers do not, and it is the only
+# Authnull component that holds no database credentials.
+
+[Unit]
+Description=AuthNull SSH proxy
+Documentation=https://github.com/authnull0/sshproxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=authnull
+Group=authnull
+
+EnvironmentFile=/etc/authnull/sshproxy/sshproxy.env
+ExecStart=/usr/local/bin/authnull-sshproxy
+
+Restart=on-failure
+RestartSec=5s
+
+# MUST exceed SSHPROXY_SHUTDOWN_GRACE_SEC, or systemd sends SIGKILL while the
+# proxy is still draining -- which truncates the recording of whatever session
+# was live, the exact outcome the drain exists to prevent. Default grace is 30s.
+TimeoutStopSec=60s
+
+# ── hardening ────────────────────────────────────────────────────────────────
+#
+# This process terminates SSH from outside the network and connects onward to
+# privileged accounts, so it gets the full set.
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6
+
+# No capabilities at all. The proxy listens on 2222 rather than 22 precisely so
+# it never needs CAP_NET_BIND_SERVICE.
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# ProtectSystem=strict makes everything read-only, so both writable paths have
+# to be named. The recordings directory is obvious. /etc/authnull/sshproxy is
+# NOT: known_hosts is appended to when a target is pinned on first use, and
+# without this the first connection to every new host fails with a permission
+# error that reads like a configuration problem.
+ReadWritePaths=/var/authnull/recordings/sshproxy /etc/authnull/sshproxy
+
+[Install]
+WantedBy=multi-user.target
