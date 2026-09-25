@@ -152,14 +152,26 @@ fi
 # that exists is one an administrator can find and inspect.
 touch "${CONF_DIR}/known_hosts"
 
+# The console's drop-in, created empty so that copying one in preserves the
+# ownership set below. `cp` over an EXISTING file keeps that file's mode and
+# owner; onto a missing one it writes root:root with the caller's umask, and a
+# config the service account cannot read is a proxy that starts with none of
+# its settings and says nothing useful about why.
+#
+# The unit loads it after sshproxy.env, so it overrides -- see the comment
+# there for why the two are separate files.
+touch "${CONF_DIR}/console.env"
+
 # The known_hosts file is APPENDED TO at runtime when a target is pinned on first
 # use, so the service account needs write access to it and to its directory.
 chown root:"$SVC_USER" "${CONF_DIR}"/host_key "${CONF_DIR}"/host_key.pub \
 	"${CONF_DIR}"/backend_key "${CONF_DIR}"/backend_key.pub \
-	"${CONF_DIR}"/ca_key "${CONF_DIR}"/ca_key.pub "${CONF_DIR}"/known_hosts
+	"${CONF_DIR}"/ca_key "${CONF_DIR}"/ca_key.pub "${CONF_DIR}"/known_hosts \
+	"${CONF_DIR}"/console.env
 chmod 0640 "${CONF_DIR}"/host_key "${CONF_DIR}"/backend_key "${CONF_DIR}"/ca_key
 chmod 0644 "${CONF_DIR}"/host_key.pub "${CONF_DIR}"/backend_key.pub "${CONF_DIR}"/ca_key.pub
 chmod 0660 "${CONF_DIR}"/known_hosts
+chmod 0640 "${CONF_DIR}"/console.env
 ok "key permissions         set"
 
 # ── config ───────────────────────────────────────────────────────────────────

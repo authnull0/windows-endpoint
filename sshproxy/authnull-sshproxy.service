@@ -15,7 +15,24 @@ Type=simple
 User=authnull
 Group=authnull
 
+# TWO files, and the split is what makes a console-generated config safe to
+# copy in wholesale.
+#
+# sshproxy.env belongs to the INSTALLER. It holds the values it generated --
+# SSHPROXY_HMAC_KEY, SSHPROXY_CA_KEY_PATH -- and nothing else should overwrite
+# it. A single EnvironmentFile meant a downloaded config dropped on top of it
+# destroyed both, silently: recordings then have no integrity sidecar and
+# certificates quietly stop, while the proxy starts and looks healthy.
+#
+# console.env belongs to the CONSOLE. Org, tenant, jump-server row, endpoints
+# -- the things only it knows. Safe to replace in full, because nothing else
+# writes it.
+#
+# Optional, hence the leading dash: a proxy configured entirely by hand has no
+# such file and must still start. Later files win on conflict, so a value in
+# console.env overrides the same key in sshproxy.env.
 EnvironmentFile=/etc/authnull/sshproxy/sshproxy.env
+EnvironmentFile=-/etc/authnull/sshproxy/console.env
 ExecStart=/usr/local/bin/authnull-sshproxy
 
 Restart=on-failure
