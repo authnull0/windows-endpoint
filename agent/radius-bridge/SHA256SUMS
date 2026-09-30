@@ -1,0 +1,4 @@
+c8918c0f09b099cd59d5c560fccbba89a15aa90fedaabf0ca5986e0a693708d7  authnull-radius-mfa-linux-amd64
+9e1a007f804f99ba42a0f962326cc1cd7478d8ed1257a61d18a845d96dc8e537  authnull-radius-mfa-linux-arm64
+5ec705cd231fe4de804d349ff1be1bab6e379d0096b3dd39fa73f81fc52304ca  install-bridge.sh
+330d32f00d38d9ec7d3224c542130e4ba8957c3f1fa186aa78a2e51081bff0f0  radius-bridge.env.example
