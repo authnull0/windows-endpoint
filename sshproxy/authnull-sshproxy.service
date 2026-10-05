@@ -19,14 +19,15 @@ Group=authnull
 # copy in wholesale.
 #
 # sshproxy.env belongs to the INSTALLER. It holds the values it generated --
-# SSHPROXY_HMAC_KEY, SSHPROXY_CA_KEY_PATH -- and nothing else should overwrite
-# it. A single EnvironmentFile meant a downloaded config dropped on top of it
-# destroyed both, silently: recordings then have no integrity sidecar and
-# certificates quietly stop, while the proxy starts and looks healthy.
+# SSHPROXY_HMAC_KEY -- and nothing else should overwrite it. A single
+# EnvironmentFile meant a downloaded config dropped on top of it destroyed it,
+# silently: recordings then have no integrity sidecar, while the proxy starts
+# and looks healthy.
 #
 # console.env belongs to the CONSOLE. Org, tenant, jump-server row, endpoints
-# -- the things only it knows. Safe to replace in full, because nothing else
-# writes it.
+# and this gateway's client credentials -- the things only it knows. The proxy
+# needs those credentials to fetch each session's grant key, the only key it
+# opens a target with. Safe to replace in full, because nothing else writes it.
 #
 # Optional, hence the leading dash: a proxy configured entirely by hand has no
 # such file and must still start. Later files win on conflict, so a value in

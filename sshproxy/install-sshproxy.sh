@@ -71,9 +71,6 @@ preflight() {
 	if [ -f "${CONF_DIR}/host_key" ]; then
 		warn "host key exists and will be LEFT ALONE (regenerating it breaks every client's known_hosts)"
 	fi
-	if [ -f "${CONF_DIR}/ca_key" ]; then
-		warn "CA key exists and will be LEFT ALONE (regenerating it invalidates trust on every target carrying the public half)"
-	fi
 }
 
 echo
@@ -125,28 +122,12 @@ else
 	ok "host key                generated"
 fi
 
-if [ -f "${CONF_DIR}/backend_key" ]; then
-	ok "backend key             kept"
-else
-	ssh-keygen -q -t ed25519 -N '' -C "authnull-sshproxy-backend@$(hostname)" -f "${CONF_DIR}/backend_key"
-	ok "backend key             generated"
-fi
-
-# One CA per proxy, generated here rather than by hand.
-#
-# By hand it lands 0600 root:root, and the service runs as authnull -- so it
-# cannot read it, and until recently that surfaced as a session failing AFTER
-# the operator had approved a push. Generating it alongside the other two keys
-# is what makes the permissions right by construction.
-#
-# Regenerating invalidates trust on every target that already carries the
-# public half, so like the host key it is never replaced if present.
-if [ -f "${CONF_DIR}/ca_key" ]; then
-	ok "CA key                  kept"
-else
-	ssh-keygen -q -t ed25519 -N '' -C "authnull-sshproxy-ca@$(hostname)" -f "${CONF_DIR}/ca_key"
-	ok "CA key                  generated"
-fi
+# No backend key and no CA key. Targets are opened only with the per-session
+# grant key the control plane releases for an approved decision, so the proxy
+# holds no standing credential for any target. backend_key and ca_key left by an
+# earlier release are no longer used; they are not deleted here (an installer
+# that removes key material is a surprise), and can be removed by hand once no
+# target trusts them.
 
 # Created empty rather than left absent: the proxy creates it anyway, but a file
 # that exists is one an administrator can find and inspect.
@@ -165,11 +146,9 @@ touch "${CONF_DIR}/console.env"
 # The known_hosts file is APPENDED TO at runtime when a target is pinned on first
 # use, so the service account needs write access to it and to its directory.
 chown root:"$SVC_USER" "${CONF_DIR}"/host_key "${CONF_DIR}"/host_key.pub \
-	"${CONF_DIR}"/backend_key "${CONF_DIR}"/backend_key.pub \
-	"${CONF_DIR}"/ca_key "${CONF_DIR}"/ca_key.pub "${CONF_DIR}"/known_hosts \
-	"${CONF_DIR}"/console.env
-chmod 0640 "${CONF_DIR}"/host_key "${CONF_DIR}"/backend_key "${CONF_DIR}"/ca_key
-chmod 0644 "${CONF_DIR}"/host_key.pub "${CONF_DIR}"/backend_key.pub "${CONF_DIR}"/ca_key.pub
+	"${CONF_DIR}"/known_hosts "${CONF_DIR}"/console.env
+chmod 0640 "${CONF_DIR}"/host_key
+chmod 0644 "${CONF_DIR}"/host_key.pub
 chmod 0660 "${CONF_DIR}"/known_hosts
 chmod 0640 "${CONF_DIR}"/console.env
 ok "key permissions         set"
@@ -190,21 +169,11 @@ else
 	NEEDS_EDIT=1
 fi
 
-# Runs on a FRESH install and an UPGRADE alike, which the branch above does not.
-#
-# An existing config is left alone wholesale, so a variable added to the example
-# after a host was first installed never reaches that host. For the CA that
-# would mean an upgraded proxy generating a key it is never told to use, and
-# staying on the shared backend key while the release notes said otherwise.
-#
-# SSHPROXY_CERT_HOSTS is deliberately NOT written. Empty is what makes the
-# rollout opt-in: the proxy has a CA and knows where it is, and still uses the
-# backend key for every target until an operator names one and has verified the
-# target accepts a certificate. Setting it here would switch an entire estate on
-# upgrade, which is the failure this design exists to avoid.
-if ! grep -q '^SSHPROXY_CA_KEY_PATH=' "$CONF_FILE"; then
-	printf '\n# Added by the installer. Sign a per-session certificate for hosts named in\n# SSHPROXY_CERT_HOSTS; every other target keeps using the backend key.\nSSHPROXY_CA_KEY_PATH=%s/ca_key\n' "$CONF_DIR" >> "$CONF_FILE"
-	ok "config                  CA key path added"
+# An existing config left by an earlier release may still carry
+# SSHPROXY_CA_KEY_PATH and friends. They are harmless -- the proxy logs that each
+# is ignored -- so the file is not edited here; say so instead.
+if grep -Eq '^SSHPROXY_(BACKEND_KEY_PATH|CA_KEY_PATH|CERT_HOSTS|CERT_VALIDITY|CERT_DENY_ACCOUNTS|SHARED_KEY_HOSTS|GRANT_ONLY_HOSTS|SESSION_GRANT_KEYS)=' "$CONF_FILE"; then
+	warn "config carries retired backend-key/CA/certificate settings; they are ignored and can be deleted"
 fi
 
 # ── binary and unit ──────────────────────────────────────────────────────────
@@ -223,8 +192,11 @@ if [ "${NEEDS_EDIT:-0}" -eq 1 ]; then
 	say "Before starting, set these in ${CONF_FILE}:"
 	say "  SSHPROXY_ORG_ID              the organisation this proxy serves"
 	say "  SSHPROXY_TENANT_ID           the tenant push MFA already uses for it"
-	say "  SSHPROXY_BACKEND_ALLOWLIST   the targets it may bridge to (empty denies all)"
+	say "  SSHPROXY_BACKEND_ALLOWLIST   optional local limit on targets (empty: policy grants decide)"
 	say "  SSHPROXY_AUTHN_URL           check the host and port are reachable from here"
+	echo
+	say "And copy this gateway's console.env from the console to ${CONF_DIR}/console.env:"
+	say "its client credentials are required to fetch each session's grant key."
 	echo
 fi
 say "Then:"
@@ -234,29 +206,12 @@ echo
 say "This proxy's host key fingerprint, which operators will be asked to trust:"
 say "  $(ssh-keygen -lf "${CONF_DIR}/host_key.pub" 2>/dev/null || echo '(unavailable)')"
 echo
-say "This proxy's CA public key. Put it on a target to let the proxy open any"
-say "account there, without touching authorized_keys per account:"
-echo
-say "  sudo tee /etc/ssh/authnull_ca.pub >/dev/null <<'EOF'"
-say "$(cat "${CONF_DIR}/ca_key.pub" 2>/dev/null || echo '(unavailable)')"
-say "EOF"
-say "  sudo chmod 644 /etc/ssh/authnull_ca.pub"
-say "  echo 'TrustedUserCAKeys /etc/ssh/authnull_ca.pub' |"
-say "    sudo tee /etc/ssh/sshd_config.d/60-authnull-ca.conf"
-say "  sudo sshd -t && sudo systemctl reload ssh"
-echo
-say "A drop-in rather than an edit, and sshd -t before the reload: a target is"
-say "often shared, and a bad sshd_config locks everyone out. Keep a session open."
-echo
-warn "That line grants this CA EVERY account on the target, including root --"
-warn "not just the accounts the backend key was appended to."
-warn "This proxy refuses to sign for root by default (SSHPROXY_CERT_DENY_ACCOUNTS),"
-warn "but that guard is ours, not the target's: anyone holding this CA key can"
-warn "still mint for any account here. Bound it on the target with an"
-warn "AuthorizedPrincipalsFile, or with an SSH policy. See docs/HOW-IT-WORKS.md."
-echo
-say "Then add that host to SSHPROXY_CERT_HOSTS and restart. Until you do, it"
-say "keeps using the backend key -- so you can verify one host at a time."
+say "Targets open only with policy grant keys. For each target:"
+say "  - run the endpoint reconcile setup script on it once, so the control"
+say "    plane can install and rotate grant keys there;"
+say "  - write an SSH policy naming the host AND the account. An account no"
+say "    policy grants is refused. root is never granted."
+say "Nothing from this proxy goes into a target's authorized_keys or sshd_config."
 echo
 say "Operators then connect as:"
 say "  ssh <account>@<target-host>@$(hostname):2222"
