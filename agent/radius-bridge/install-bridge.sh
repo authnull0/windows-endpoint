@@ -200,22 +200,47 @@ elif grep -q 'authnull_mfa' "$SITE"; then
 else
 	# cp -n "$SITE" "${SITE}.pre-authnull" 2>/dev/null || true
 	cp -n "$SITE" "$SITE_BACKUP" 2>/dev/null || true
-	python3 - "$SITE" <<'PY'
-import sys
-p = sys.argv[1]
-s = open(p).read()
-hook = '''
-\tauthnull_mfa
-\tif (fail) {
-\t\tupdate reply { Reply-Message := "MFA denied or not approved in time" }
-\t\treject
-\t}
-'''
-i = s.index('post-auth {') + len('post-auth {')
-open(p, 'w').write(s[:i] + hook + s[i:])
-PY
-	# ok "post-auth hook        inserted (backup at ${SITE}.pre-authnull)"
-	ok "post-auth hook        inserted (backup at ${SITE_BACKUP})"
+	# python3 is not on a minimal Debian / RHEL server, and set -e stopped the install
+	# here -- before app.env was applied. awk is on every server and does the same insert.
+	# python3 - "$SITE" <<'PY'
+	# import sys
+	# p = sys.argv[1]
+	# s = open(p).read()
+	# hook = '''
+	# \tauthnull_mfa
+	# \tif (fail) {
+	# \t\tupdate reply { Reply-Message := "MFA denied or not approved in time" }
+	# \t\treject
+	# \t}
+	# '''
+	# i = s.index('post-auth {') + len('post-auth {')
+	# open(p, 'w').write(s[:i] + hook + s[i:])
+	# PY
+	#
+	# The hook goes straight after the first uncommented "post-auth {". Written back with
+	# cat, not mv: sites-enabled/default is a symlink and must stay one.
+	hook_tmp="$(mktemp)"
+	awk '
+		!done && /^[[:space:]]*post-auth[[:space:]]*\{/ {
+			print
+			print "\tauthnull_mfa"
+			print "\tif (fail) {"
+			print "\t\tupdate reply { Reply-Message := \"MFA denied or not approved in time\" }"
+			print "\t\treject"
+			print "\t}"
+			done = 1
+			next
+		}
+		{ print }
+	' "$SITE" > "$hook_tmp"
+	cat "$hook_tmp" > "$SITE"
+	rm -f "$hook_tmp"
+	if grep -q 'authnull_mfa' "$SITE"; then
+		# ok "post-auth hook        inserted (backup at ${SITE}.pre-authnull)"
+		ok "post-auth hook        inserted (backup at ${SITE_BACKUP})"
+	else
+		warn "no post-auth section in ${SITE}; add the hook manually (see ../docs/RADIUS.md)"
+	fi
 fi
 
 # ── timeouts ─────────────────────────────────────────────────────────────────
