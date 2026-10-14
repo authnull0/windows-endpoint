@@ -393,9 +393,12 @@ fi
 # Clone ProxySQL repository
 print_status "Cloning ProxySQL repository..."
 if [ -d "proxysql-v3-alpha" ]; then
-    print_status "Directory proxysql-v3-alpha already exists, pulling latest changes..."
+    print_status "Directory proxysql-v3-alpha already exists, fetching latest changes..."
     cd proxysql-v3-alpha
-    git pull || print_error "Failed to pull latest changes from repository."
+    # fetch, not pull: a pull here updated whichever branch was checked out before the checkout
+    # below, so a re-install built a stale local copy of on-prem. The reset below pins the build
+    # to origin/on-prem.
+    git fetch origin || print_error "Failed to fetch latest changes from repository."
 else
     git clone https://github.com/authnull0/proxysql-v3-alpha.git || print_error "Failed to clone repository."
     cd proxysql-v3-alpha
@@ -417,6 +420,7 @@ fi
 # challenge, and the failure looks like the backend timing out rather than a wrong branch.
 print_status "Checking out on-prem branch..."
 git checkout on-prem || print_error "Failed to checkout on-prem branch."
+git reset --hard origin/on-prem || print_error "Failed to reset to origin/on-prem."
 
 # Build ProxySQL
 print_status "Cleaning previous build..."
@@ -509,8 +513,18 @@ if [ -z "$API" ]; then
     echo "API=$API" | tee -a "$env_file" >/dev/null
 fi
 
-# The full auth endpoint is always the configured host plus this fixed path.
+# The full auth endpoint is the configured host plus this fixed path -- unless authn-service is
+# on this machine. An on-prem monolith publishes it on 127.0.0.1:2882, and calling it there needs
+# no hostname or IP, so a change of the VM address never breaks database logins. Anything but a
+# 200 means it is not here, and API is used.
 API_URL="${API%/}/authnull0/api/v1/authn/v3/do-authenticationV4"
+LOCAL_API_URL="http://127.0.0.1:2882/authnull0/api/v1/authn/v3/do-authenticationV4"
+# POST, the method the route is registered for: an empty body is answered 200 isValid:false.
+local_probe_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' "$LOCAL_API_URL" || echo 000)"
+if [ "$local_probe_code" = "200" ]; then
+    print_status "authn-service is on this machine; using $LOCAL_API_URL"
+    API_URL="$LOCAL_API_URL"
+fi
 
 print_status "Verifying API host is reachable: $API_URL"
 # A REACHABLE HOST IS NOT A WORKING ENDPOINT.
@@ -540,15 +554,20 @@ case "$api_probe_code" in
         ;;
 esac
 
-# Add authnull section to proxysql.cnf
+# Write the authnull section to proxysql.cnf
 #
-# Guarded: this was an unconditional append, so running the installer twice left TWO [authnull]
-# sections in proxysql.cnf and whichever the parser reached last silently won -- including a stale
-# org_id or api_url from a previous run.
-if grep -qE '^[[:space:]]*authnull[[:space:]]*=' /etc/proxysql.cnf; then
-    print_status "An [authnull] section already exists in /etc/proxysql.cnf -- leaving it alone."
-    print_status "To change it, edit that section by hand: org_id=$ORG_ID tenant_id=$TENANT_ID api_url=$API_URL"
-else
+# REPLACED, not appended and not skipped. An unconditional append left two sections after a
+# re-install, and whichever the parser reached last silently won. But skipping when one exists is
+# worse: make install from proxysql-v3-alpha/on-prem ships /etc/proxysql.cnf WITH an authnull
+# section (org_id=2, api_url=onprem.dev.authnull.com), so the skip fired on every fresh install
+# and the real org and URL were never written. Remove whatever block is there, then write ours.
+awk '
+    /^[[:space:]]*authnull[[:space:]]*=/ { skip = 1 }
+    skip { if ($0 ~ /}/) { skip = 0 }; next }
+    { print }
+' /etc/proxysql.cnf > /etc/proxysql.cnf.tmp && mv /etc/proxysql.cnf.tmp /etc/proxysql.cnf \
+    || print_error "Failed to remove the existing authnull section from /etc/proxysql.cnf."
+
 cat >> /etc/proxysql.cnf << EOL
 
 authnull =
@@ -559,12 +578,29 @@ authnull =
 }
 EOL
 [ $? -eq 0 ] || print_error "Failed to update /etc/proxysql.cnf."
+
+# The AuthNull MFA hook runs only on the clear-text password path. ProxySQL's default for the
+# Postgres frontend is SCRAM-SHA-256 (3), which never reaches the hook: every login is refused
+# with "Access denied ... (using password: YES)" and authn-service is never called. 1 = clear
+# text. The file is read on first start only; it is applied through the admin interface as well
+# once ProxySQL is up, below.
+if ! grep -qE '^[[:space:]]*pgsql_variables[[:space:]]*=' /etc/proxysql.cnf; then
+cat >> /etc/proxysql.cnf << EOL
+
+pgsql_variables =
+{
+    authentication_method = 1
+}
+EOL
 fi
 
 # Set permissions
 print_status "Setting permissions for /etc/proxysql.cnf..."
-chown proxysql:proxysql /etc/proxysql.cnf || print_error "Failed to chown /etc/proxysql.cnf."
-chmod 644 /etc/proxysql.cnf || print_error "Failed to chmod /etc/proxysql.cnf."
+# make install leaves it root-only (0600). systemd runs ProxySQL as proxysql, which then cannot
+# read its config and exits at once ("Result: protocol", no log written). root:proxysql 0640 lets
+# it read the file while keeping the admin credentials in it from other users.
+chown root:proxysql /etc/proxysql.cnf || print_error "Failed to chown /etc/proxysql.cnf."
+chmod 640 /etc/proxysql.cnf || print_error "Failed to chmod /etc/proxysql.cnf."
 
 # Create and set permissions for /var/lib/proxysql/
 print_status "Setting up /var/lib/proxysql/..."
@@ -596,6 +632,15 @@ else
     print_error "ERROR: ProxySQL service failed to start."
     exit 1
 fi
+
+# pgsql_variables in the file is ignored when /var/lib/proxysql/proxysql.db already exists (a
+# re-install), so set clear-text auth through the admin interface too. This build closes any
+# connection whose username has no comma -- admin included -- hence "admin,setup".
+print_status "Setting ProxySQL Postgres authentication method to clear text..."
+sleep 3
+mysql -u 'admin,setup' -padmin -h 127.0.0.1 -P 6032 --ssl-mode=DISABLED -e \
+    "UPDATE global_variables SET variable_value='1' WHERE variable_name='pgsql-authentication_method'; LOAD PGSQL VARIABLES TO RUNTIME; SAVE PGSQL VARIABLES TO DISK;" \
+    || print_error "Failed to set pgsql-authentication_method on ProxySQL."
 # # Restart db agent once again to ensure connectivity to proxysql
 # print_status "Restarting db-agent service to ensure connectivity to ProxySQL..."
 # systemctl restart db-agent || print_error "Failed to restart db-agent service."
