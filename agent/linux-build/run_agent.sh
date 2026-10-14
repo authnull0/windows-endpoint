@@ -538,7 +538,12 @@ print_status "Verifying API host is reachable: $API_URL"
 # do-authenticationV4 is a POST endpoint. A GET against it should not 404: a 404 means the path is
 # not routed to authn-service at all. 405 (method not allowed) or 400 both prove it IS routed, so
 # they are accepted.
-api_probe_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$API_URL" || echo 000)"
+#
+# Probed with POST, the method the route is registered for. A GET is answered 404 by authn-service
+# itself (its router has no method-not-allowed handling), so on 127.0.0.1:2882 -- where nginx is not
+# in front -- a GET failed the install here, before the authnull section was written, the config
+# permissions fixed or ProxySQL started. An empty JSON body is answered 200 with isValid:false.
+api_probe_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST -H 'Content-Type: application/json' -d '{}' "$API_URL" || echo 000)"
 case "$api_probe_code" in
     000)
         print_error "Could not reach '$API_URL' at all. Check the API host in $env_file and network connectivity."
