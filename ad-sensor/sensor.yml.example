@@ -1,56 +1,70 @@
 # Authnull DC Sensor — Configuration
-# Copy this file to C:\ProgramData\Authnull\sensor.yml and fill in your values.
+#
+# Prefer the sensor.yml downloaded from the Authnull console (Identity Providers → your
+# directory → Install DC Sensor): it is filled in for the directory and carries this DC's
+# sensor credential. This file documents the keys for a hand-written config.
+# Location on the DC: C:\ProgramData\Authnull\sensor.yml
 
 # ── Backend ────────────────────────────────────────────────────────────────────
+# authn-service decides every sign-in (policy, bypass and push in one call). Use https://:
+# the sensor does not follow redirects, so an http:// URL is reported as an error.
+authn_service_url: "https://prod.api.authnull.com"
+# User sync, audit events and the heartbeat that shows the sensor Active in the console.
 ad_service_url: "https://prod.api.authnull.com"
-policy_service_url: "https://prod.api.authnull.com"
 
-# Obtain tenant_id and org_id from the Authnull dashboard
+# Obtain tenant_id and org_id from the Authnull console
 tenant_id: 1
 org_id: 0
 
 # Default AD domain FQDN — used when auth events don't include a domain name
 default_domain: "yourdomain.local"
 
+# ── Sensor credential ──────────────────────────────────────────────────────────
+# Issued per domain controller by the console download. Exchanged for a short-lived token sent
+# on calls to ad_service_url. Keep this file readable only by the sensor's service account.
+sensor_token_url: ""
+sensor_client_id: ""
+sensor_client_secret: ""
+
 # ── AD Sync ────────────────────────────────────────────────────────────────────
 ad_sync_enabled: true
 
-# Domain ID from the Authnull dashboard (Active Directory → your domain → ID)
+# Directory ID from the Authnull console (Identity Providers → your directory)
 ad_sync_domain_id: 0
 
 # LDAP base DN for user sync — matches your AD structure
 ad_sync_base_dn: "DC=yourdomain,DC=local"
 
 # Only sync users who are members of these groups (leave empty to sync all users)
-ad_sync_filter_groups:
-  - "Domain Users"
+ad_sync_filter_groups: []
 
 # Only sync users in these OUs (leave empty to sync all OUs)
-ad_sync_filter_ous:
-  - "OU=CorpUsers"
+ad_sync_filter_ous: []
 
 # ── Interception ───────────────────────────────────────────────────────────────
-# Enable WinDivert packet-level Kerberos interception (recommended)
+# Holds Kerberos and NTLM-over-SMB sign-ins until the policy decision.
+# Needs WinDivert.dll + WinDivert64.sys next to the sensor binary (install.ps1 fetches them).
 windivert_enabled: true
+windivert_ipv6_enabled: true
 
-# Enable Windows Filtering Platform enforcement (required for NTLM fallback blocking)
+# Windows Filtering Platform: blocks NTLM fallback ports while a push is pending.
 wfp_enabled: true
 
-# Per-resource MFA: intercept TGS-REP for these service classes
-# Requires windivert_enabled: true
-# Leave empty to disable per-resource MFA (only login MFA fires)
+# Service tickets held for a decision even when the user already has a TGT.
+# "termsrv/*" covers RDP between domain machines. The policy decides who is challenged.
 tgs_protected_spns:
-  - "cifs/*"
+  - "termsrv/*"
 
 # ── Enforcement ────────────────────────────────────────────────────────────────
-# "enforce" = block/allow per verdict | "monitor" = log only, never block
+# The sensor enforces whatever the policies in the console say.
 mode: "enforce"
 
-# How long (ms) an MFA approval is cached before requiring a new push
-# Default: 120000 (2 minutes)
-allow_deduplication_window_ms: 120000
+# How long an approval is reused for a policy whose MFA frequency is "every time": just the
+# follow-up requests of one sign-in. Policies with "every N minutes" use their own window.
+allow_deduplication_window_ms: 15000
 
-# What to do if the Authnull backend is unreachable: "allow" or "deny"
+# What to do if Authnull cannot be reached: "deny" refuses the sign-in, "allow" lets it in
+# without MFA.
 fallback_action: "deny"
 
 # ── Logging ────────────────────────────────────────────────────────────────────
