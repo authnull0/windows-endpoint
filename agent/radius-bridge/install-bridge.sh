@@ -307,14 +307,22 @@ EOF
 	if ! grep -q 'authnull_ad_auth_type' "$SITE"; then
 		local tmp
 		tmp="$(mktemp)"
-		if awk '/^[[:space:]]*authorize[[:space:]]*\{/ {a=1} a && /^[[:space:]]*-?ldap[[:space:]]*$/ {f=1} END {exit !f}' "$SITE"; then
-			# After the site's own ldap call, which now finds the user.
-			awk '
-				/^[[:space:]]*authorize[[:space:]]*\{/ { a = 1 }
-				{ print }
-				a && !done && /^[[:space:]]*-?ldap[[:space:]]*$/ { print "\tauthnull_ad_auth_type"; done = 1 }
-			' "$SITE" > "$tmp"
-		else
+		# After the site's own ldap call in AUTHORIZE, which now finds the user -- counted by braces,
+		# so an ldap line in authenticate (Auth-Type LDAP { ldap }) is not mistaken for it (review of
+		# #132). No ldap call there: add one, ahead of authnull_code_prepare.
+		awk '
+			function braces(s,   t) { t = s; sub(/#.*/, "", t); return gsub(/\{/, "{", t) - gsub(/\}/, "}", t) }
+			!inside && !done && /^[[:space:]]*authorize[[:space:]]*\{/ { inside = 1; depth = braces($0); print; next }
+			inside {
+				print
+				if (!done && /^[[:space:]]*-?ldap[[:space:]]*$/) { print "\tauthnull_ad_auth_type"; done = 1 }
+				depth += braces($0)
+				if (depth <= 0) inside = 0
+				next
+			}
+			{ print }
+		' "$SITE" > "$tmp"
+		if ! grep -q 'authnull_ad_auth_type' "$tmp"; then
 			awk '!done && /^[[:space:]]*authnull_code_prepare[[:space:]]*$/ { print "\tldap"; print "\tauthnull_ad_auth_type"; done = 1 } { print }' "$SITE" > "$tmp"
 		fi
 		cat "$tmp" > "$SITE"
@@ -340,7 +348,19 @@ EOF
 	# The test login: through FreeRADIUS on this host, so AD and the AuthNull push both run.
 	command -v radclient >/dev/null 2>&1 || { warn "no radclient (package freeradius-utils): skipping the test login"; return 0; }
 	local secret user pw out
-	secret="$(awk '/^[[:space:]]*client[[:space:]]+localhost[[:space:]]*\{/ {c=1} c && /^[[:space:]]*secret[[:space:]]*=/ {sub(/^[^=]*=[[:space:]]*/, ""); gsub(/["[:space:]]/, ""); print; exit}' "${RADDB}/clients.conf")"
+	# The localhost client's secret, as written: a quoted value keeps its spaces (review of #132).
+	secret="$(awk '
+		function braces(s,   t) { t = s; sub(/#.*/, "", t); return gsub(/\{/, "{", t) - gsub(/\}/, "}", t) }
+		!c && /^[[:space:]]*client[[:space:]]+localhost[[:space:]]*\{/ { c = 1; depth = braces($0); next }
+		c && depth == 1 && /^[[:space:]]*secret[[:space:]]*=/ {
+			v = $0; sub(/^[^=]*=[[:space:]]*/, "", v)
+			if (v ~ /^"/) { sub(/^"/, "", v); sub(/".*$/, "", v) }
+			else if (v ~ /^\047/) { sub(/^\047/, "", v); sub(/\047.*$/, "", v) }
+			else { sub(/[[:space:]#].*$/, "", v) }
+			print v; exit
+		}
+		c { depth += braces($0); if (depth <= 0) exit }
+	' "${RADDB}/clients.conf")"
 	[ -n "$secret" ] || { warn "no localhost client in clients.conf: skipping the test login"; return 0; }
 	have_tty || { warn "no terminal: skipping the test login"; return 0; }
 	echo
@@ -348,10 +368,17 @@ EOF
 	[ -n "$user" ] || return 0
 	ask pw "Password of ${user}" "" silent
 	say "logging in as ${user}; approve the AuthNull push if one arrives (up to 90 s)..."
+	# The secret goes in a file (radclient -S), not on a command line every local user can read.
+	local secretfile
+	secretfile="$(mktemp)"
+	chmod 600 "$secretfile"
+	printf '%s\n' "$secret" > "$secretfile"
 	out="$(printf 'User-Name = "%s", User-Password = "%s"\n' \
 		"$(printf '%s' "$user" | sed 's/[\\"]/\\&/g')" "$(printf '%s' "$pw" | sed 's/[\\"]/\\&/g')" |
-		radclient -t 90 -r 1 127.0.0.1:1812 auth "$secret" 2>&1 || true)"
-	if printf '%s' "$out" | grep -q 'Access-Accept'; then
+		radclient -t 90 -r 1 -S "$secretfile" 127.0.0.1:1812 auth 2>&1 || true)"
+	rm -f "$secretfile"
+	# "Received": radclient also prints "Expected Access-Accept got Access-Reject".
+	if printf '%s' "$out" | grep -q 'Received Access-Accept'; then
 		ok "test login            accepted: AD password and AuthNull MFA both passed"
 	else
 		warn "test login was not accepted:"
@@ -420,7 +447,7 @@ cat > "${RADDB}/mods-available/${MODULE_NAME}" <<EOF
 # Installed by install-bridge.sh. See onprem/docs/RADIUS.md.
 exec authnull_mfa {
     wait    = yes
-    program = "${BIN_DEST} --user='%{User-Name}' --nas-ip='%{NAS-IP-Address}' --nas-id='%{NAS-Identifier}' --packet-src-ip='%{Packet-Src-IP-Address}' --station='%{Calling-Station-Id}' --service-type='%{Service-Type}' --session-id='%{Acct-Session-Id}' --nas-port='%{NAS-Port}' --otp='%{control:Tmp-String-9}' --state='%{control:Tmp-String-5}' --challenge-capable='%{control:Tmp-String-7}' --decided='%{control:Tmp-String-8}'"
+    program = "${BIN_DEST} --user='%{User-Name}' --nas-ip='%{NAS-IP-Address}' --nas-id='%{NAS-Identifier}' --packet-src-ip='%{Packet-Src-IP-Address}' --station='%{Calling-Station-Id}' --service-type='%{Service-Type}' --session-id='%{Acct-Session-Id}' --nas-port='%{NAS-Port}' --otp='%{control:AuthNull-Code}' --state='%{control:AuthNull-State}' --challenge-capable='%{control:AuthNull-Prompt-Possible}' --decided='%{control:AuthNull-Decided}'"
     output_pairs = reply
     timeout = 90
 }
@@ -448,26 +475,54 @@ ok "module                ${RADDB}/mods-enabled/${MODULE_NAME}"
 #   AuthNull itself issued, once, within 2 minutes. AuthNull keeps that State, not this server,
 #   so either of two FreeRADIUS servers can finish a login.
 #
-# Control attributes used (internal, never sent to a client): Tmp-String-9 the code,
-# Tmp-String-5 the prompt's State, Tmp-String-6 the password check's Auth-Type, Tmp-String-7
-# "the password passed, a prompt is possible", Tmp-String-8 "the second factor is settled".
+# The policy keeps its state in its own attributes, defined below in the local dictionary --
+# internal, never sent in a packet, and not the generic Tmp-String-* a site's own policy may also
+# use (review of radius-bridge#5): AuthNull-Code the code, AuthNull-State the prompt's State,
+# AuthNull-Password-Check the Auth-Type authorize chose, AuthNull-Prompt-Possible "the password
+# passed, a prompt is possible", AuthNull-Decided "the second factor is settled".
+if ! grep -q 'AuthNull-Prompt-Possible' "${RADDB}/dictionary" 2>/dev/null; then
+	if grep -Eqs '^[[:space:]]*ATTRIBUTE[[:space:]]+[^[:space:]]+[[:space:]]+391[0-4]([[:space:]]|$)' "${RADDB}/dictionary"; then
+		die "${RADDB}/dictionary already uses attribute numbers 3910-3914; the typed-code attributes need them"
+	fi
+	cat >> "${RADDB}/dictionary" <<'EOF'
+
+# AuthNull RADIUS bridge (install-bridge.sh): internal attributes of the typed-code policy.
+# Local-use numbers; never sent in a packet.
+ATTRIBUTE	AuthNull-Code			3910	string
+ATTRIBUTE	AuthNull-State			3911	string
+ATTRIBUTE	AuthNull-Password-Check		3912	string
+ATTRIBUTE	AuthNull-Prompt-Possible	3913	string
+ATTRIBUTE	AuthNull-Decided		3914	string
+EOF
+	ok "dictionary            AuthNull-* attributes in ${RADDB}/dictionary"
+fi
 install -d -m 0755 "${RADDB}/policy.d"
 cat > "${RADDB}/policy.d/${MODULE_NAME}" <<'EOF'
 # Installed by install-bridge.sh. See onprem/docs/RADIUS.md#typed-codes.
 
 # Top of authorize.
 authnull_otp_split {
-	if (&State && ("%{client:authnull_prompt}" == "yes")) {
-		# The prompt's second round: only the code. AuthNull checks it issued this State.
+	# The prompt's second round: a client that prompts, a State of the shape AuthNull issues (16
+	# bytes), and not EAP -- EAP and any other challenge keep their own State and their own path
+	# (review of authnull-service#132). The round carries only the code; AuthNull checks it issued
+	# this State, once, within 2 minutes, before anything else.
+	if (&State && !&EAP-Message && ("%{client:authnull_prompt}" == "yes") && ("%{State}" =~ /^0x[0-9a-f]{32}$/)) {
 		update control {
-			&Tmp-String-5 := "%{State}"
-			&Tmp-String-9 := "%{User-Password}"
+			&AuthNull-State := "%{State}"
+		}
+		# Only an answer shaped like a code goes to the bridge, so a password typed into the code
+		# box never reaches its command line (review of radius-bridge#5). Empty: a push, if the
+		# policy offers one.
+		if (&User-Password && (&User-Password =~ /^([0-9]{6}|[A-Za-z0-9]{4}-?[A-Za-z0-9]{4})$/)) {
+			update control {
+				&AuthNull-Code := &User-Password
+			}
 		}
 		authnull_mfa
 		if (ok) {
 			update control {
 				&Auth-Type := Accept
-				&Tmp-String-8 := "yes"
+				&AuthNull-Decided := "yes"
 			}
 			return
 		}
@@ -475,7 +530,7 @@ authnull_otp_split {
 	}
 	elsif (&User-Password && (&User-Password =~ /^(.+),([0-9]{6})$/)) {
 		update control {
-			&Tmp-String-9 := "%{2}"
+			&AuthNull-Code := "%{2}"
 		}
 		update request {
 			&User-Password := "%{1}"
@@ -495,11 +550,11 @@ authnull_ad_auth_type {
 
 # End of authorize: a first round on a client that prompts goes through authnull_code, which
 # checks the password by the type authorize chose and then asks AuthNull. Only for the password
-# checks it knows; anything else keeps the ordinary post-auth push.
+# checks it knows, and never for EAP; anything else keeps the ordinary post-auth push.
 authnull_code_prepare {
-	if (!&State && !&control:Tmp-String-9 && ("%{client:authnull_prompt}" == "yes") && ("%{control:Auth-Type}" =~ /^(PAP|LDAP|ntlm_auth)$/)) {
+	if (!&State && !&EAP-Message && !&control:AuthNull-Code && ("%{client:authnull_prompt}" == "yes") && ("%{control:Auth-Type}" =~ /^(PAP|LDAP|ntlm_auth)$/)) {
 		update control {
-			&Tmp-String-6 := "%{control:Auth-Type}"
+			&AuthNull-Password-Check := "%{control:Auth-Type}"
 			&Auth-Type := authnull_code
 		}
 	}
@@ -507,7 +562,7 @@ authnull_code_prepare {
 
 # Auth-Type authnull_code: the password, then AuthNull -- a push or the prompt.
 authnull_code_check {
-	switch "%{control:Tmp-String-6}" {
+	switch "%{control:AuthNull-Password-Check}" {
 		case "PAP" {
 			pap
 		}
@@ -523,7 +578,7 @@ authnull_code_check {
 	}
 	if (ok) {
 		update control {
-			&Tmp-String-7 := "yes"
+			&AuthNull-Prompt-Possible := "yes"
 		}
 		# "handled" (the prompt) would end the section by default; carry on to turn it into
 		# an Access-Challenge.
@@ -533,13 +588,13 @@ authnull_code_check {
 		if (handled) {
 			update control {
 				&Response-Packet-Type := Access-Challenge
-				&Tmp-String-8 := "yes"
+				&AuthNull-Decided := "yes"
 			}
 			handled
 		}
 		elsif (ok) {
 			update control {
-				&Tmp-String-8 := "yes"
+				&AuthNull-Decided := "yes"
 			}
 			ok
 		}
@@ -570,6 +625,8 @@ After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=${BIN_DEST} --heartbeat
+# oneshot units have no start timeout by default; a hung check would stop the timer for good.
+TimeoutStartSec=120
 EOF
 cat > "/etc/systemd/system/${HB_UNIT}.timer" <<EOF
 # Installed by install-bridge.sh. See onprem/docs/RADIUS.md.
@@ -634,9 +691,14 @@ else
 	awk '
 		!done && /^[[:space:]]*post-auth[[:space:]]*\{/ {
 			print
-			print "\tauthnull_mfa"
+			print "\tauthnull_mfa {"
+			print "\t\thandled = 1"
+			print "\t}"
 			print "\tif (fail) {"
 			print "\t\tupdate reply { Reply-Message := \"MFA denied or not approved in time\" }"
+			print "\t\treject"
+			print "\t}"
+			print "\telsif (handled) {"
 			print "\t\treject"
 			print "\t}"
 			done = 1

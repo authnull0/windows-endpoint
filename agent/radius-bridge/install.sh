@@ -91,11 +91,13 @@ main() {
 
 	# Verified before anything runs as root. Only the files downloaded are checked, and
 	# all three must be listed -- a file missing from SHA256SUMS is a failure, not a pass.
+	# SHA256SUMS comes from the same place as the files, so this catches a broken or partial
+	# download, not a tampered one; that rests on HTTPS to GitHub (review of #132).
 	( cd "$TMP" &&
 		grep -E "[ *](${binary}|install-bridge\.sh|radius-bridge\.env\.example)\$" SHA256SUMS > want.sums &&
 		[ "$(wc -l < want.sums)" -eq 3 ] &&
 		sha256sum --quiet --check want.sums ) \
-		|| die "checksum mismatch -- the download is corrupt or has been altered; nothing was installed"
+		|| die "checksum mismatch -- the download is incomplete or corrupt; nothing was installed"
 	say "checksums verified"
 
 	chmod +x "${TMP}/${binary}" "${TMP}/install-bridge.sh"
