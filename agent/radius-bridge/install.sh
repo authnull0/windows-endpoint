@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 #
+# SOURCE OF TRUTH: authnull-service/onprem/radius-bridge (RADIUS MFA plan, WS9.1). The copy in
+# windows-endpoint branch radius is published from there by publish.sh -- edit it there.
+#
 # Bootstrap for the AuthNull RADIUS bridge. Runs on your FreeRADIUS server.
 #
 #   curl -fsSL https://github.com/authnull0/windows-endpoint/raw/radius/agent/radius-bridge/install.sh | sudo bash -s -- ./app.env
+#
+# Add --ad to also connect FreeRADIUS to Active Directory and test a login (it asks for the
+# domain controller and a service account on the terminal):
+#
+#   curl -fsSL .../install.sh | sudo bash -s -- ./app.env --ad
 #
 # Read it before running it -- it runs as root.
 #
@@ -10,7 +18,7 @@
 # and hands off to install-bridge.sh, the real installer. install-bridge.sh needs its
 # config template beside it, so downloading it alone gets you a half-install.
 #
-# Given app.env (from the console: Radius Devices > Connect FreeRADIUS) it then
+# Given app.env (from the console: RADIUS Servers > Add server) it then
 # installs that as /etc/authnull/radius-bridge.env. Without it, edit that file by hand.
 
 set -euo pipefail
@@ -25,15 +33,29 @@ say() { printf '  %s\n' "$*"; }
 main() {
 	[ "$(id -u)" -eq 0 ] || die "must run as root: ... | sudo bash -s -- ./app.env"
 
+	# --ad anywhere: connect to Active Directory after the install (WS9.2).
+	local ad=0 a
+	local args=()
+	for a in "$@"; do
+		if [ "$a" = "--ad" ]; then ad=1; else args+=("$a"); fi
+	done
+	set -- "${args[@]+"${args[@]}"}"
+
 	# Checked before anything is downloaded, so a wrong path fails with nothing changed.
-	# The bridge has no defaults for these four and rejects every login without them.
+	# The bridge has no defaults for these three and rejects every login without them.
+	# DOMAIN is optional: without it authn-service resolves each user's own directory.
 	local env_src="${1:-}"
 	if [ -n "$env_src" ]; then
-		[ -f "$env_src" ] || die "app.env not found: ${env_src} -- download it from Radius Devices > Connect FreeRADIUS"
+		# [ -f "$env_src" ] || die "app.env not found: ${env_src} -- download it from Radius Devices > Connect FreeRADIUS"
+		[ -f "$env_src" ] || die "app.env not found: ${env_src} -- download it from RADIUS Servers > Add server"
 		local k
-		for k in API_BASE_URL ORG_ID TENANT_ID DOMAIN; do
+		# for k in API_BASE_URL ORG_ID TENANT_ID DOMAIN; do
+		for k in API_BASE_URL ORG_ID TENANT_ID; do
 			grep -Eq "^${k}=[^[:space:]]+" "$env_src" || die "${env_src} has no value for ${k} -- download it again from the console"
 		done
+		# Not required -- logins work without it ("unknown server") -- but the heartbeat does.
+		grep -Eq "^RADIUS_SERVER_ID=[^[:space:]]+" "$env_src" ||
+			say "note: ${env_src} has no RADIUS_SERVER_ID, so the console cannot show this server's health. Download it from RADIUS Servers."
 	fi
 
 	if command -v curl >/dev/null 2>&1; then
@@ -81,8 +103,18 @@ main() {
 	echo
 	bash "${TMP}/install-bridge.sh" "${TMP}/${binary}" </dev/null
 
-	[ -n "$env_src" ] || return 0
+	if [ -n "$env_src" ]; then
+		install_env "$env_src"
+	fi
+	if [ "$ad" -eq 1 ]; then
+		echo
+		bash "${TMP}/install-bridge.sh" --ad
+	fi
+}
 
+# install_env installs the console's app.env as the bridge config.
+install_env() {
+	local env_src="$1"
 	# A file edited on Windows has CRLF endings, and "ORG_ID=2\r" is not a number to the
 	# bridge -- every login would be rejected.
 	tr -d '\r' < "$env_src" > "${TMP}/app.env"

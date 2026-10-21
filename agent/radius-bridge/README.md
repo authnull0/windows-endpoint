@@ -6,7 +6,7 @@ approval, or is blocked.
 
 ## Install
 
-1. In the AuthNull console go to **Radius Devices > Connect FreeRADIUS** and download `app.env`.
+1. In the AuthNull console go to **RADIUS Servers > Add server > FreeRADIUS** and download `app.env`.
 2. Copy `app.env` to your FreeRADIUS server and run, in the same folder:
 
    ```
@@ -22,6 +22,10 @@ for a preflight that changes nothing.
 
 Logs: `/var/log/authnull/radius-bridge.log`
 
+Health: the installer adds `authnull-radius-heartbeat.timer`, which reports this server's
+status to the console every 60 seconds (RADIUS Servers). Run
+`sudo /usr/local/bin/authnull-radius-mfa --heartbeat` to see each check.
+
 ## Files
 
 | File | What it is |
@@ -32,3 +36,6 @@ Logs: `/var/log/authnull/radius-bridge.log`
 | `radius-bridge.env.example` | Config template, used when no `app.env` is given |
 | `SHA256SUMS` | Checksums `install.sh` verifies |
 | `BUILD-INFO` | Source commit the bridge was built from |
+
+Published from `authnull-service/onprem/radius-bridge` by `publish.sh`. Do not edit
+these files here: the next publish overwrites them.
