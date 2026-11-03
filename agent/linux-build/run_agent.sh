@@ -32,6 +32,24 @@ print_status() {
     echo -e "${GREEN}[+] $1${NC}"
 }
 
+# read_db_env FILE: read the db.env content the console gave, from the terminal, up to an empty line
+# (or the end of input), and save it to FILE -- replacing any old copy, readable by root only.
+#
+# The content is never echoed: it holds the tenant KEY. The old loop echoed it through tee into the
+# terminal and the install log, ignored the empty line its own prompt asks for (so it swallowed the
+# answers to every later prompt, the database password included, into db.env), and appended to an
+# existing db.env on every reinstall.
+read_db_env() {
+  local file="$1" content="" line
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "$line" ] && break
+    content+="$line"$'\n'
+  done
+  ( umask 077; printf '%s' "$content" > "$file" )
+  chmod 600 "$file"
+  echo "Saved $file ($(grep -c . "$file") line(s); contents not shown)"
+}
+
 # Function to print error and exit
 print_error() {
     echo -e "${RED}[-] ERROR: $1${NC}"
@@ -219,21 +237,7 @@ fi
   # Prompt user to input content for db.env
   echo -e "${GREEN}Please enter the content for the db.env file. End with an empty line or Ctrl+D:${NC}${NORMAL}"
 
-  # Initialize an empty string to store the content
-  db_env_content=""
-
-  # Read input line by line
-  while IFS= read -r line || [ -n "$line" ]; do
-    # Append the line and a newline character to db_env_content
-    db_env_content+="$line"$'\n'
-  done
-
-  # Remove the trailing newline character
-  db_env_content=${db_env_content%$'\n'}
-
-  # Create the db.env file with the provided content
-  # sudo echo -n "$db_env_content" > db.env
-  echo "$db_env_content" | tee -a db.env
+  read_db_env db.env
 
 #   # Prompt for host
 #   echo -en "${BOLD}${YELLOW}=> Enter host${BLUE}: ${NORMAL}${NC}"
