@@ -68,6 +68,42 @@ authnull_caller_lines() {
     "$PROXY_CLIENT_ID" "$PROXY_CLIENT_SECRET" "${API%/}/api/v1/database/proxy/token"
 }
 
+# proxy_source_ip HOST: the address this machine -- the proxy -- uses to reach HOST, which is
+# what the database server sees ProxySQL connect from. Empty when it cannot be worked out.
+proxy_source_ip() {
+  local target="$1" ip=""
+  # A name: resolve it first, ip route wants an address.
+  if ! [[ "$target" =~ ^[0-9.]+$ || "$target" == *:* ]]; then
+    target="$(getent ahosts "$target" 2>/dev/null | awk 'NR==1 {print $1}')"
+  fi
+  [ -n "$target" ] || return 0
+  ip="$(ip route get "$target" 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") {print $(i + 1); exit}}')"
+  printf '%s' "$ip"
+}
+
+# print_hba_guidance HOST USER: what the database server's pg_hba.conf needs so that only this
+# proxy can log in as the roles AuthNull manages (DB-MFA-HARDENING S1), and the grants that let
+# the agent (USER) check it every sync. The agent puts every managed role in authnull_managed.
+print_hba_guidance() {
+  local host="$1" user="$2" proxy mask="/32"
+  proxy="$(proxy_source_ip "$host")"
+  [[ "$proxy" == *:* ]] && mask="/128"
+  echo
+  echo "On the database server ($host), put these lines at the TOP of pg_hba.conf (first match wins),"
+  echo "then reload Postgres (SELECT pg_reload_conf();). Without them, anyone who reaches the database"
+  echo "directly can try to log in as a managed role and skip MFA:"
+  echo
+  echo "    host  all  +authnull_managed  ${proxy:-<proxy IP>}${proxy:+$mask}  scram-sha-256"
+  echo "    host  all  +authnull_managed  0.0.0.0/0  reject"
+  echo "    host  all  +authnull_managed  ::/0  reject"
+  echo
+  echo "So the agent can check this every sync and report it in the console, run as a superuser:"
+  echo
+  echo "    GRANT SELECT ON pg_hba_file_rules TO \"$user\";"
+  echo "    GRANT EXECUTE ON FUNCTION pg_hba_file_rules() TO \"$user\";"
+  echo
+}
+
 # Function to print error and exit
 print_error() {
     echo -e "${RED}[-] ERROR: $1${NC}"
@@ -155,6 +191,7 @@ EOF
 echo "Database '$host' added successfully"
 # Remove Windows-style line endings if present
 sed -i 's/\r$//' "$DATA_SOURCE_FILE"
+print_hba_guidance "$host" "$username"
 }
 delete_database() {
 echo -e "${GREEN}=> Deleting database configuration...${NC}${NORMAL}"
