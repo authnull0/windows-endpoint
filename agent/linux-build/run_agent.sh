@@ -50,6 +50,24 @@ read_db_env() {
   echo "Saved $file ($(grep -c . "$file") line(s); contents not shown)"
 }
 
+# authnull_caller_lines: the [authnull] lines for ProxySQL's own credential to authn-service
+# (DB-MFA-HARDENING S3), from PROXY_CLIENT_ID / PROXY_CLIENT_SECRET in db.env and the API host.
+# Prints nothing, and says why on stderr, when db.env has no credential or a malformed one:
+# ProxySQL then calls authn-service without one, which works only until authn-service is set to
+# require caller credentials (AUTHN_REQUIRE_CALLER_AUTH). The secret is never echoed.
+authnull_caller_lines() {
+  if [ -z "${PROXY_CLIENT_ID:-}" ] && [ -z "${PROXY_CLIENT_SECRET:-}" ]; then
+    echo "WARNING: db.env has no PROXY_CLIENT_ID / PROXY_CLIENT_SECRET (a db.env from an older console). ProxySQL will call authn-service without a caller credential; download a fresh db.env before authn-service requires one." >&2
+    return 0
+  fi
+  if ! [[ "${PROXY_CLIENT_ID:-}" =~ ^dpc-[0-9]+-[0-9a-f]+$ ]] || ! [[ "${PROXY_CLIENT_SECRET:-}" =~ ^dps_[A-Za-z0-9_-]+$ ]]; then
+    echo "WARNING: PROXY_CLIENT_ID / PROXY_CLIENT_SECRET in db.env are malformed; not written. Download a fresh db.env." >&2
+    return 0
+  fi
+  printf '    client_id = "%s"\n    client_secret = "%s"\n    token_url = "%s"\n' \
+    "$PROXY_CLIENT_ID" "$PROXY_CLIENT_SECRET" "${API%/}/api/v1/database/proxy/token"
+}
+
 # Function to print error and exit
 print_error() {
     echo -e "${RED}[-] ERROR: $1${NC}"
@@ -577,6 +595,9 @@ awk '
 ' /etc/proxysql.cnf > /etc/proxysql.cnf.tmp && mv /etc/proxysql.cnf.tmp /etc/proxysql.cnf \
     || print_error "Failed to remove the existing authnull section from /etc/proxysql.cnf."
 
+# ProxySQL's own credential to authn-service, when db.env carries one. The file is root:proxysql
+# 0640 (below), so only ProxySQL can read the secret.
+CALLER_LINES="$(authnull_caller_lines)"
 cat >> /etc/proxysql.cnf << EOL
 
 authnull =
@@ -584,9 +605,11 @@ authnull =
     org_id = $ORG_ID
     tenant_id = $TENANT_ID
     api_url = "$API_URL"
+${CALLER_LINES}
 }
 EOL
 [ $? -eq 0 ] || print_error "Failed to update /etc/proxysql.cnf."
+if [ -n "$CALLER_LINES" ]; then print_status "ProxySQL caller credential $PROXY_CLIENT_ID written to /etc/proxysql.cnf (secret not shown)"; fi
 
 # The AuthNull MFA hook runs only on the clear-text password path. ProxySQL's default for the
 # Postgres frontend is SCRAM-SHA-256 (3), which never reaches the hook: every login is refused
