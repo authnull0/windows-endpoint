@@ -55,6 +55,32 @@ wfp_enabled: true
 tgs_protected_spns:
   - "termsrv/*"
 
+# ── Netlogon (NTLM pass-through) ─────────────────────────────────────────────────
+# Closes the gap where a member server validates a user's NTLM credentials against the DC over
+# the Netlogon secure channel (the path Kerberos/SMB interception never sees — e.g. RDP or WinRM
+# from a non-domain machine). Requires windivert_enabled: true.
+#   ""/"off"         disabled (default)
+#   "observe-logons" decrypt + log the logon identity, no blocking
+#   "enforce"        hold the SamLogon, run MFA, release on allow / reset on deny
+netlogon_mode: ""
+
+# TCP port(s) the DC's Netlogon RPC endpoint listens on. Netlogon uses a dynamic port by
+# default; pin it to a static port and list it here (observe-logons/enforce need this). Pin with
+# HKLM\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters\DCTcpipPort (DWORD) + reboot.
+# Empty = Netlogon capture off.
+netlogon_rpc_ports: []
+
+# Decrypt sealed Netlogon SamLogon bodies so the real logon identity drives the MFA decision
+# (modern Netlogon always seals). Path to a file of machine-account NT hashes, one per line:
+#   ACCOUNT=NThashHex    e.g.  MEMBER01$=31d6cfe0d16ae931b73c59d7e0c089c0
+# Empty = no decryption; sealed logons fall back to the 4776 event-log path.
+# TIER-0 SECRET: restrict this file to the sensor service account and audit access.
+netlogon_machine_key_file: ""
+
+# Debug only: dump parsed Netlogon PDUs to <prefix>.hexlog / <prefix>.pcap for troubleshooting.
+# Leave empty in production (the pcap holds raw authentication PDUs).
+netlogon_debug_dump_path: ""
+
 # ── Enforcement ────────────────────────────────────────────────────────────────
 # The sensor enforces whatever the policies in the console say.
 mode: "enforce"
@@ -62,6 +88,12 @@ mode: "enforce"
 # How long an approval is reused for a policy whose MFA frequency is "every time": just the
 # follow-up requests of one sign-in. Policies with "every N minutes" use their own window.
 allow_deduplication_window_ms: 15000
+
+# One-push-per-sign-in window (ms). A single interactive/RDP sign-in fires several auth events
+# with different source identities (NTLM source IP, event-log workstation name) and protocols
+# (Kerberos, NTLM, Netlogon). The first verdict for a user is reused for all of them within this
+# window, so the user is prompted once per sign-in instead of several times. Default 20000 (20s).
+signin_dedup_window_ms: 20000
 
 # What to do if Authnull cannot be reached: "deny" refuses the sign-in, "allow" lets it in
 # without MFA.
