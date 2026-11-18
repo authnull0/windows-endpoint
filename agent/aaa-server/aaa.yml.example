@@ -1,0 +1,76 @@
+# AuthNull AAA server configuration.
+#
+# Installed to /etc/authnull/aaa.yml by install.sh, root:authnull-aaa 0640 (it holds shared
+# secrets). install.sh never overwrites an existing aaa.yml. Reference: AAA-SERVER.md.
+#
+# Reload after editing, no restart and no dropped logins:   systemctl reload authnull-aaa
+# A reload that fails (bad YAML, no clients) keeps the running config and logs "reload failed".
+# Check a file first:  authnull-aaa --check --config /etc/authnull/aaa.yml
+# listen, spool and log_path are read at start only: changing them needs  systemctl restart authnull-aaa
+# (spool.dir and log_path must stay under the unit's ReadWritePaths: /var/lib/authnull-aaa, /var/log/authnull-aaa)
+
+# Where the server listens. "" turns a listener off. Defaults shown.
+listen:
+  radius_auth: ":1812"   # UDP
+  radius_acct: ":1813"   # UDP
+  tacacs: ":49"          # TCP
+
+# Network devices that may talk to this server. A packet from an address that matches no
+# client is dropped silently. The most specific network wins when two match.
+clients:
+  # A firewall or VPN gateway speaking RADIUS.
+  - name: vpn-hq
+    address: 192.0.2.10            # one IP, or a CIDR such as 192.0.2.0/24
+    radius_secret: CHANGE-ME       # the shared secret configured on the device
+    prompt: false                  # true: ask for the code in an "Enter code" challenge
+                                   #   (FortiGate, GlobalProtect, AnyConnect; not OpenVPN)
+    # allow_no_message_authenticator: false  # true only for a device that cannot send it
+  # A switch or router speaking TACACS+.
+  # - name: core-switch
+  #   address: 192.0.2.20
+  #   tacacs_key: CHANGE-ME
+
+  # A client may carry both radius_secret and tacacs_key.
+  # forwarder: true marks an NPS/ISE/ClearPass that forwards logins from devices behind it
+  # (RADIUS only; no tacacs_key).
+
+# The server that checks the password: your existing Microsoft NPS, Aruba ClearPass or
+# Cisco ISE. Several may be listed; they are tried in order and the next one is used when
+# one does not answer. The address must not be inside a client network above (it would loop).
+upstreams:
+  - name: nps-1
+    type: nps                      # nps | clearpass | ise
+    address: 192.0.2.50:1812       # host:port
+    secret: CHANGE-ME              # the shared secret for authnull-aaa on that server
+    timeout_sec: 5
+    # allow_no_message_authenticator: false  # true only for an older server that does not
+    #                                          sign its answers
+
+# Local users (optional): passwords checked by this server, never sent to the upstreams. For a site
+# without AD or NPS/ClearPass/ISE, or a few admin accounts. name is the person's email in AuthNull
+# (the push goes to the phone enrolled for it). Make a hash with:
+#   read -rs P; printf '%s' "$P" | authnull-aaa --hash-password; unset P
+# local_users:
+#   - name: jane@example.com
+#     password_hash: '<bcrypt hash>'
+
+# 802.1X (optional): Wi-Fi and wired logins with EAP-TTLS (inner PAP; local users or the upstreams)
+# and PEAP (EAP-MSCHAPv2; needs an upstream). Push only. Off without this block.
+# cert_file/key_file: PEM, key unencrypted, root:authnull-aaa 0640; clients must trust the issuing CA.
+# eap:
+#   cert_file: /etc/authnull/eap.pem
+#   key_file: /etc/authnull/eap.key
+#   methods: [ttls, peap]          # default; the first is offered
+#   remember_hours: 0              # 0 (default): always push. Up to 168: after an approved push, no
+#                                  #   push again for that user and device (Wi-Fi/wired, by MAC)
+#   max_sessions: 4096             # EAP logins in progress at once
+#   fragment_size: 1000            # TLS bytes per EAP packet, 100-3000
+
+# Login events and accounting wait here while authnull-service is unreachable. When it is
+# full the oldest records are dropped (counted in a warning); the device still gets its answer.
+spool:
+  dir: /var/lib/authnull-aaa/spool
+  max_mb: 256
+
+# The server's log file; it also logs to stderr (journald). app.env LOG_PATH is not used.
+log_path: /var/log/authnull-aaa/aaa.log
