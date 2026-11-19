@@ -17,6 +17,10 @@
 #
 # Safe to run again: the binary and unit are replaced, /etc/authnull/aaa.yml is never overwritten, and a
 # different app.env passed in replaces the current one, which is kept as app.env.bak-<time>.
+#
+# Console-managed servers (app.env has a SERVER_TOKEN, as the console's app.env download does): the
+# devices come from the AuthNull console, so aaa.yml is written ready to use (no example devices, no
+# upstream) and the service starts. Only an untouched template from an earlier run is replaced.
 
 set -euo pipefail
 
@@ -56,6 +60,26 @@ preflight() {
 	fi
 	if have_systemd; then ok "systemd present"; else warn "no systemd here: the service cannot be installed; run authnull-aaa by hand"; bad=1; fi
 	return "$bad"
+}
+
+# aaa.yml for a console-managed server: the console's devices are pulled with the SERVER_TOKEN, so no
+# clients or upstreams here (without an upstream, AuthNull checks the passwords). Ready to start.
+write_managed_config() {
+	cat > "${TMP}/aaa.yml.managed" <<EOF
+# authnull-aaa. Devices come from the AuthNull console (SERVER_TOKEN in app.env): add them under
+# Network Devices; this server picks them up within a minute. Devices listed under clients: here are
+# used too. No upstreams: AuthNull checks the passwords (add an NPS / ISE / ClearPass upstream to use AD).
+listen:
+  radius_auth: ":1812"   # UDP
+  radius_acct: ":1813"   # UDP
+  tacacs: ":49"          # TCP
+clients: []
+spool:
+  dir: ${STATE_DIR}/spool
+  max_mb: 256
+log_path: ${LOG_DIR}/aaa.log
+EOF
+	install -m 0640 -o root -g "$SVC_USER" "${TMP}/aaa.yml.managed" "$CFG_FILE"
 }
 
 # The daemon appends to its log forever and keeps it open: logrotate trims it with copytruncate.
@@ -162,8 +186,23 @@ main() {
 	fi
 	install_logrotate
 
-	if [ -f "$CFG_FILE" ]; then
+	# Console-managed when the app.env being installed (or, without one, the installed one) has a token.
+	local managed=0 env_for_mode="${env_src:-$ENV_FILE}"
+	if [ -f "$env_for_mode" ] && tr -d '\r' < "$env_for_mode" | grep -Eq '^SERVER_TOKEN=[^[:space:]]+'; then
+		managed=1
+	fi
+
+	# was: kept if present, else always the template (add your devices and upstream).
+	if [ -f "$CFG_FILE" ] && [ "$managed" -eq 1 ] && cmp -s "$CFG_FILE" "${TMP}/aaa.yml.example"; then
+		# The untouched template from an earlier run: nothing of the operator's is in it.
+		cp -p "$CFG_FILE" "${CFG_FILE}.template-$(date +%Y%m%d%H%M%S)"
+		write_managed_config
+		ok "installed         ${CFG_FILE} (devices from the AuthNull console; replaced the unedited template)"
+	elif [ -f "$CFG_FILE" ]; then
 		ok "kept              ${CFG_FILE} (never overwritten)"
+	elif [ "$managed" -eq 1 ]; then
+		write_managed_config
+		ok "installed         ${CFG_FILE} (devices from the AuthNull console)"
 	else
 		install -m 0640 -o root -g "$SVC_USER" "${TMP}/aaa.yml.example" "$CFG_FILE"
 		ok "installed         ${CFG_FILE} (template: add your devices and upstream)"
@@ -193,6 +232,13 @@ main() {
 	if command -v runuser >/dev/null 2>&1 && [ -f "$ENV_FILE" ] &&
 		! runuser -u "$SVC_USER" -- test -r "$ENV_FILE"; then
 		warn "${SVC_USER} cannot read ${ENV_FILE}: check ${CONF_DIR} and the file are group ${SVC_USER} (a directory shared with the RADIUS bridge is group freerad)"
+	fi
+
+	# A console-managed server reaches authnull-service at HEARTBEAT_URL minus its path; with an https
+	# API_BASE_URL there is no default, so without it the server never turns Active nor gets its devices.
+	if [ "$managed" -eq 1 ] && [ -f "$ENV_FILE" ] && ! grep -Eq '^HEARTBEAT_URL=[^[:space:]]+' "$ENV_FILE" &&
+		grep -Eq '^API_BASE_URL=https://' "$ENV_FILE"; then
+		warn "${ENV_FILE} has no HEARTBEAT_URL: set HEARTBEAT_URL=<AuthNull address>/api/v1/radius/heartbeat, then  systemctl restart authnull-aaa"
 	fi
 
 	local ready=1
@@ -226,7 +272,9 @@ main() {
 	fi
 
 	echo
-	if have_systemd && systemctl is-active --quiet authnull-aaa; then
+	if [ "$managed" -eq 1 ]; then
+		say "Next: add your devices in the AuthNull console (Network Devices); this server picks them up within a minute."
+	elif have_systemd && systemctl is-active --quiet authnull-aaa; then
 		say "Next: add your devices and upstream in ${CFG_FILE}, then  systemctl reload authnull-aaa"
 	else
 		say "Next: add your devices and upstream in ${CFG_FILE}, then  systemctl start authnull-aaa"
